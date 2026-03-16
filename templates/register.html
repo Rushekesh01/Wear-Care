@@ -1,0 +1,68 @@
+{% extends 'base.html' %}
+
+{% block title %}Create account — Wear & Care{% endblock %}
+
+{% block content %}
+<section class="wc-section pt-0">
+  <div class="row justify-content-center">
+    <div class="col-md-9 col-lg-6">
+      <div class="text-center mb-4">
+        <h1 class="h2 fw-bold wc-title mb-2">Create your account</h1>
+        <p class="wc-lead mb-0">Join us to start donating and tracking your impact.</p>
+      </div>
+
+      <div class="wc-card">
+        <div class="wc-card-body">
+          <form method="POST" action="/register" novalidate>
+            {% if error %}
+              <div class="alert alert-danger mb-3" role="alert">{{ error }}</div>
+            {% endif %}
+            
+            <div class="mb-3">
+<label class="form-label">Full Name</label>
+<input
+class="form-control"
+type="text"
+name="name"
+placeholder="Enter your name"
+required>
+</div>
+
+<div class="mb-3">
+<label class="form-label">Email</label>
+<input
+class="form-control"
+type="email"
+name="email"
+placeholder="Enter your email"
+required>
+</div>
+
+<div class="mb-3">
+<label class="form-label">Password</label>
+<input
+class="form-control"
+type="password"
+name="password"
+placeholder="Create password"
+required>
+</div>
+              <div class="form-text wc-muted">
+                Use at least 8 characters with a mix of letters, numbers, and symbols.
+              </div>
+            </div>
+
+            <button class="btn btn-wc-accent w-100" type="submit">Create account</button>
+
+            <div class="text-center mt-4">
+              <div class="small wc-muted">
+                Already have an account? <a href="/login" class="link-light">Log in</a>
+              </div>
+            </div>
+          </form>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+{% endblock %}

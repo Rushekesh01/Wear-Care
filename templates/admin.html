@@ -1,0 +1,63 @@
+{% extends 'base.html' %}
+
+{% block title %}Admin — Wear & Care{% endblock %}
+
+{% block content %}
+<section class="wc-section pt-0">
+  <div class="d-flex flex-column flex-md-row align-items-md-end justify-content-between gap-2 mb-4">
+    <div>
+      <h1 class="h2 fw-bold wc-title mb-2">Admin panel</h1>
+      <p class="wc-lead mb-0">Review donations and update approval status.</p>
+    </div>
+    <div class="d-flex gap-2">
+      <a href="/dashboard" class="btn btn-wc-ghost">Dashboard</a>
+      <a href="/" class="btn btn-wc-ghost">Home</a>
+    </div>
+  </div>
+
+  <div class="wc-card">
+    <div class="wc-card-body">
+      <div class="table-responsive">
+        <table class="table table-striped align-middle mb-0">
+          <thead>
+            <tr>
+              <th>ID</th>
+              <th>Name</th>
+              <th>Cloth</th>
+              <th>Size</th>
+              <th>Status</th>
+              <th class="text-end">Action</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for d in donations %}
+            <tr>
+              <td class="wc-muted">{{ d[0] }}</td>
+              <td class="fw-semibold">{{ d[1] }}</td>
+              <td>{{ d[2] }}</td>
+              <td>{{ d[3] }}</td>
+              <td>
+                {% set status = d[7] %}
+                {% if status == 'Approved' %}
+                  <span class="badge wc-badge text-bg-success">Approved</span>
+                {% elif status == 'Rejected' %}
+                  <span class="badge wc-badge text-bg-danger">Rejected</span>
+                {% else %}
+                  <span class="badge wc-badge text-bg-secondary">{{ status }}</span>
+                {% endif %}
+              </td>
+              <td class="text-end">
+                <div class="d-flex justify-content-end gap-2">
+                  <a href="/approve/{{ d[0] }}" class="btn btn-sm btn-wc-primary">Approve</a>
+                  <a href="/reject/{{ d[0] }}" class="btn btn-sm btn-danger">Reject</a>
+                </div>
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</section>
+{% endblock %}

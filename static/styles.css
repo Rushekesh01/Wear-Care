@@ -1,0 +1,314 @@
+/* Wear & Care - Global Styles (Professional UI layer)
+   ---------------------------------------------------
+   This stylesheet is intentionally lightweight and built on top of Bootstrap 5.
+   It adds a consistent visual system (colors, type, spacing, components).
+*/
+
+:root{
+  --wc-bg: #0b1220;
+  --wc-surface: #0f1b2d;
+  --wc-card: rgba(255,255,255,0.06);
+  --wc-card-border: rgba(255,255,255,0.10);
+
+  --wc-text: #eaf0ff;
+  --wc-muted: rgba(234,240,255,0.72);
+
+  --wc-brand: #5b8cff; /* primary */
+  --wc-brand-2: #20c997; /* accent */
+  --wc-warn: #ffb020;
+
+  --wc-radius: 16px;
+  --wc-radius-sm: 12px;
+
+  --wc-shadow: 0 14px 40px rgba(0,0,0,0.35);
+  --wc-shadow-soft: 0 10px 30px rgba(0,0,0,0.22);
+
+  --wc-focus: 0 0 0 .25rem rgba(91,140,255,0.30);
+}
+
+html, body{
+  height:100%;
+}
+
+body{
+  font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, "Apple Color Emoji", "Segoe UI Emoji";
+  background:
+    radial-gradient(1200px 600px at 10% 10%, rgba(91,140,255,0.25), transparent 55%),
+    radial-gradient(900px 500px at 90% 20%, rgba(32,201,151,0.18), transparent 55%),
+    linear-gradient(180deg, var(--wc-bg), #070b14 70%);
+  color: var(--wc-text);
+}
+
+/* Layout */
+.wc-container{
+  max-width: 1100px;
+}
+
+.wc-page{
+  padding: 2.25rem 0 3rem;
+}
+
+.wc-section{
+  padding: 2.5rem 0;
+}
+
+/* Typography */
+.wc-title{
+  letter-spacing: -0.02em;
+}
+
+.wc-lead{
+  color: var(--wc-muted);
+}
+
+/* Navbar */
+.navbar.wc-navbar{
+  background: rgba(10,16,28,0.55) !important;
+  backdrop-filter: blur(14px);
+  border-bottom: 1px solid rgba(255,255,255,0.08);
+}
+
+.wc-brand{
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+
+.navbar .nav-link{
+  color: rgba(234,240,255,0.82) !important;
+  font-weight: 500;
+}
+
+.navbar .nav-link:hover{
+  color: #ffffff !important;
+}
+
+.navbar .nav-link.active{
+  color: #ffffff !important;
+}
+
+/* Buttons */
+.btn{
+  border-radius: 999px;
+  padding: .65rem 1.05rem;
+  font-weight: 600;
+  transition: transform .15s ease, box-shadow .15s ease, background-color .15s ease, border-color .15s ease;
+}
+
+.btn:focus{
+  box-shadow: var(--wc-focus) !important;
+}
+
+.btn:hover{
+  transform: translateY(-1px);
+}
+
+.btn-wc-primary{
+  background: linear-gradient(135deg, var(--wc-brand), #7aa1ff);
+  border: 1px solid rgba(255,255,255,0.14);
+  color: #071021;
+}
+
+.btn-wc-primary:hover{
+  box-shadow: 0 10px 22px rgba(91,140,255,0.25);
+  color:#071021;
+}
+
+.btn-wc-accent{
+  background: linear-gradient(135deg, var(--wc-brand-2), #7bf3cf);
+  border: 1px solid rgba(255,255,255,0.14);
+  color: #071021;
+}
+
+.btn-wc-accent:hover{
+  box-shadow: 0 10px 22px rgba(32,201,151,0.22);
+  color:#071021;
+}
+
+.btn-wc-ghost{
+  background: rgba(255,255,255,0.06);
+  border: 1px solid rgba(255,255,255,0.16);
+  color: rgba(234,240,255,0.90);
+}
+
+.btn-wc-ghost:hover{
+  background: rgba(255,255,255,0.10);
+  color: #ffffff;
+}
+
+/* Cards */
+.wc-card{
+  background: var(--wc-card);
+  border: 1px solid var(--wc-card-border);
+  border-radius: var(--wc-radius);
+  box-shadow: var(--wc-shadow-soft);
+}
+
+.wc-card-header{
+  padding: 1.25rem 1.25rem 0;
+}
+
+.wc-card-body{
+  padding: 1.25rem;
+}
+
+.wc-card-hover{
+  transition: transform .18s ease, box-shadow .18s ease, border-color .18s ease;
+}
+
+.wc-card-hover:hover{
+  transform: translateY(-3px);
+  border-color: rgba(255,255,255,0.18);
+  box-shadow: var(--wc-shadow);
+}
+
+/* Hero */
+.wc-hero{
+  position: relative;
+  overflow: hidden;
+  border-radius: calc(var(--wc-radius) + 6px);
+  border: 1px solid rgba(255,255,255,0.10);
+  box-shadow: var(--wc-shadow);
+  background:
+    linear-gradient(180deg, rgba(7,11,20,0.35), rgba(7,11,20,0.85)),
+    url("https://images.unsplash.com/photo-1521335629791-ce4aec67dd49?auto=format&fit=crop&w=1600&q=60");
+  background-size: cover;
+  background-position: center;
+}
+
+.wc-hero-inner{
+  padding: 4.5rem 1.5rem;
+}
+
+@media (min-width: 992px){
+  .wc-hero-inner{
+    padding: 5.5rem 3.25rem;
+  }
+}
+
+.wc-hero-kicker{
+  display:inline-flex;
+  align-items:center;
+  gap:.5rem;
+  padding:.35rem .75rem;
+  border-radius: 999px;
+  background: rgba(255,255,255,0.08);
+  border: 1px solid rgba(255,255,255,0.14);
+  color: rgba(234,240,255,0.92);
+  font-weight: 600;
+  font-size: .9rem;
+}
+
+/* Forms */
+.form-control, .form-select{
+  border-radius: 14px;
+  background: rgba(255,255,255,0.06);
+  border: 1px solid rgba(255,255,255,0.14);
+  color: rgba(234,240,255,0.95);
+}
+
+.form-control::placeholder{
+  color: rgba(234,240,255,0.55);
+}
+
+.form-control:focus, .form-select:focus{
+  background: rgba(255,255,255,0.08);
+  border-color: rgba(91,140,255,0.55);
+  box-shadow: var(--wc-focus);
+  color: rgba(234,240,255,0.95);
+}
+
+.form-label{
+  color: rgba(234,240,255,0.85);
+  font-weight: 600;
+}
+
+/* Tables */
+.table{
+  color: rgba(234,240,255,0.92);
+}
+
+.table thead th{
+  color: rgba(234,240,255,0.95);
+  font-weight: 700;
+  border-bottom-color: rgba(255,255,255,0.12) !important;
+}
+
+.table tbody td{
+  color: rgba(234,240,255,0.95);
+}
+
+.table td, .table th{
+  border-color: rgba(255,255,255,0.10) !important;
+}
+
+.table a.link-light{
+  color: #95b8ff;
+}
+.table a.link-light:hover{
+  color: #ffffff;
+}
+
+.table-striped>tbody>tr:nth-of-type(odd)>
+*{
+  --bs-table-bg-type: rgba(255,255,255,0.03);
+}
+
+/* Status badges */
+.badge.wc-badge{
+  border-radius: 999px;
+  padding: .5rem .7rem;
+  font-weight: 700;
+  letter-spacing: .01em;
+}
+
+/* Footer */
+.wc-footer{
+  border-top: 1px solid rgba(255,255,255,0.08);
+  background: rgba(10,16,28,0.45);
+}
+
+/* Utility */
+.wc-muted{ color: var(--wc-muted) !important; }
+.wc-divider{
+  height: 1px;
+  background: rgba(255,255,255,0.10);
+}
+
+/* FIX: Dashboard table text visibility */
+
+.table {
+  color: #ffffff !important;
+}
+
+.table td {
+  color: #eaf0ff !important;
+  font-weight: 500;
+}
+
+.table th {
+  color: #ffffff !important;
+  font-weight: 700;
+}
+
+.table-striped > tbody > tr:nth-of-type(odd) {
+  background-color: rgba(255,255,255,0.05) !important;
+}
+
+.table-striped > tbody > tr:nth-of-type(even) {
+  background-color: rgba(255,255,255,0.02) !important;
+}
+
+/* Dashboard table fix */
+
+.table-dark {
+  background-color: #0f1b2d;
+}
+
+.table-dark td,
+.table-dark th {
+  color: #ffffff !important;
+}
+
+.table-dark tbody tr {
+  border-color: rgba(255,255,255,0.1);
+}

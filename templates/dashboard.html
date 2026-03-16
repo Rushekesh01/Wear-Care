@@ -1,0 +1,139 @@
+{% extends 'base.html' %}
+
+{% block title %}Dashboard — Wear & Care{% endblock %}
+
+{% block head %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+{% endblock %}
+
+{% block content %}
+<section class="wc-section pt-0">
+  <div class="d-flex flex-column flex-md-row align-items-md-end justify-content-between gap-2 mb-4">
+    <div>
+      <h1 class="h2 fw-bold wc-title mb-2">Donation dashboard</h1>
+      <p class="wc-lead mb-0">Track submissions, view images, and check approval status.</p>
+    </div>
+    <div class="d-flex gap-2">
+      <a href="/donate" class="btn btn-wc-accent">New donation</a>
+      <a href="/" class="btn btn-wc-ghost">Home</a>
+    </div>
+  </div>
+
+  {% if donations is none or donations|length == 0 %}
+    <div class="wc-card">
+      <div class="wc-card-body d-flex flex-column flex-md-row align-items-md-center justify-content-between gap-3">
+        <div>
+          <div class="h4 fw-bold mb-1">No donations yet</div>
+          <div class="wc-muted">Submit your first donation to see updates here.</div>
+        </div>
+        <a class="btn btn-wc-accent" href="/donate">Donate now</a>
+      </div>
+    </div>
+  {% else %}
+
+  <div class="row g-3 mb-3">
+    <div class="col-md-4">
+      <div class="wc-card">
+        <div class="wc-card-body">
+          <div class="small wc-muted">Total donations</div>
+          <div class="h2 fw-bold mb-0">{{ donations|length }}</div>
+        </div>
+      </div>
+    </div>
+    <div class="col-md-8">
+      <div class="wc-card">
+        <div class="wc-card-body">
+          <div class="small wc-muted mb-2">Donation statistics</div>
+          <canvas id="donationChart" height="90"></canvas>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="wc-card">
+    <div class="wc-card-body">
+      <div class="table-responsive">
+        <table class="table table-dark table-striped align-middle mb-0">
+          <thead>
+            <tr>
+              <th>Name</th>
+              <th>Cloth</th>
+              <th>Size</th>
+              <th>Condition</th>
+              <th>Address</th>
+              <th>Image</th>
+              <th>Status</th>
+            </tr>
+          </thead>
+          <tbody>
+          {% for d in donations %}
+            <tr>
+              <td class="fw-semibold">{{ d[1] if d|length > 1 else '' }}</td>
+              <td>{{ d[2] if d|length > 2 else '' }}</td>
+              <td>{{ d[3] if d|length > 3 else '' }}</td>
+              <td>{{ d[4] if d|length > 4 else '' }}</td>
+              <td>{{ d[5] if d|length > 5 else '' }}</td>
+              <td>
+                {% if d|length > 6 and d[6] %}
+                  <a class="link-light" href="{{ url_for('static', filename='uploads/' + d[6]) }}" target="_blank" rel="noopener">View</a>
+                {% else %}
+                  <span class="wc-muted">—</span>
+                {% endif %}
+              </td>
+              <td>
+                {% set status = (d[7] if d|length > 7 else '') %}
+                {% if status == 'Approved' %}
+                  <span class="badge wc-badge text-bg-success">Approved</span>
+                {% elif status == 'Rejected' %}
+                  <span class="badge wc-badge text-bg-danger">Rejected</span>
+                {% elif status == 'Pending' or status == '' or status is none %}
+                  <span class="badge wc-badge text-bg-secondary">Pending</span>
+                {% else %}
+                  <span class="badge wc-badge text-bg-secondary">{{ status }}</span>
+                {% endif %}
+              </td>
+            </tr>
+          {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  {% endif %}
+</section>
+{% endblock %}
+
+{% block scripts %}
+{% if donations is not none and donations|length != 0 %}
+<script>
+  const ctx = document.getElementById('donationChart');
+  if (ctx) {
+    new Chart(ctx, {
+      type: 'bar',
+      data: {
+        labels: ['Total Donations'],
+        datasets: [{
+          label: 'Donations',
+          data: [{{ donations|length }}],
+          backgroundColor: ['rgba(91, 140, 255, 0.85)'],
+          borderColor: ['rgba(255,255,255,0.15)'],
+          borderWidth: 1,
+          borderRadius: 10
+        }]
+      },
+      options: {
+        responsive: true,
+        plugins: {
+          legend: { labels: { color: 'rgba(234,240,255,0.85)' } }
+        },
+        scales: {
+          x: { ticks: { color: 'rgba(234,240,255,0.75)' }, grid: { color: 'rgba(255,255,255,0.08)' } },
+          y: { ticks: { color: 'rgba(234,240,255,0.75)' }, grid: { color: 'rgba(255,255,255,0.08)' }, beginAtZero: true }
+        }
+      }
+    });
+  }
+</script>
+{% endif %}
+{% endblock %}

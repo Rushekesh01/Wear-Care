@@ -1,0 +1,85 @@
+{% extends 'base.html' %}
+
+{% block title %}Login — Wear & Care{% endblock %}
+
+{% block content %}
+<section class="wc-section pt-0">
+  <div class="row justify-content-center">
+    <div class="col-md-8 col-lg-5">
+      <div class="text-center mb-4">
+        <h1 class="h2 fw-bold wc-title mb-2">Welcome back</h1>
+        <p class="wc-lead mb-0">Log in to access your dashboard and track donations.</p>
+      </div>
+
+      <div class="wc-card">
+        <div class="wc-card-body">
+          <form method="POST" action="/login" novalidate>
+            {% if error %}
+              <div class="alert alert-danger mb-3" role="alert">{{ error }}</div>
+            {% endif %}
+            
+            <div class="mb-3">
+              <label class="form-label" for="email">Email address</label>
+              <input 
+                class="form-control" 
+                id="email" 
+                type="email" 
+                name="email" 
+                placeholder="your@email.com"
+                value="{{ request.form.get('email', '') }}"
+                autocomplete="off"
+                required
+                autofocus
+              >
+            </div>
+
+            <div class="mb-3">
+              <label class="form-label" for="password">Password</label>
+              <input 
+                class="form-control" 
+                id="password" 
+                type="password" 
+                name="password" 
+                placeholder="Enter your password"
+                autocomplete="new-password"
+                required
+              >
+            </div>
+
+            <div class="mb-3 form-check">
+              <input type="checkbox" class="form-check-input" id="remember" name="remember">
+              <label class="form-check-label wc-muted" for="remember">Remember me</label>
+            </div>
+
+            <button class="btn btn-wc-primary w-100" type="submit">Sign in</button>
+
+            <div class="text-center mt-4">
+              <div class="small wc-muted">
+                Don't have an account? <a href="/register" class="link-light">Create one</a>
+              </div>
+              <div class="small wc-muted mt-2">
+                Test account: test@example.com / password123
+              </div>
+            </div>
+          </form>
+        </div>
+      </div>
+
+      <div class="text-center mt-3 small wc-muted">
+        After logging in, visit your <span class="text-white">Dashboard</span> to track donations.
+      </div>
+    </div>
+  </div>
+</section>
+{% endblock %}
+
+{% block scripts %}
+<script>
+  document.addEventListener('DOMContentLoaded', function() {
+    // Prevent browser autofill
+    setTimeout(function() {
+      document.getElementById('email').value = '';
+    }, 100);
+  });
+</script>
+{% endblock %}
