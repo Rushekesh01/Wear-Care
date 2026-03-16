@@ -1,0 +1,112 @@
+{% extends 'base.html' %}
+
+{% block title %}Edit Listing — Wear & Care{% endblock %}
+
+{% block content %}
+<section class="wc-section pt-0">
+  <div class="d-flex flex-column flex-md-row align-items-md-end justify-content-between gap-2 mb-4">
+    <div>
+      <h1 class="h2 fw-bold wc-title mb-2">Edit listing</h1>
+      <p class="wc-lead mb-0">Admin can update any listing details.</p>
+    </div>
+    <div class="d-flex gap-2">
+      <a href="/admin" class="btn btn-wc-ghost">Back</a>
+      <a href="/listings" class="btn btn-wc-ghost">Listings</a>
+    </div>
+  </div>
+
+  <div class="row justify-content-center">
+    <div class="col-md-12 col-lg-9">
+      <div class="wc-card">
+        <div class="wc-card-body">
+          <form method="POST" novalidate>
+            {% set is_free = (donation[10] if donation|length > 10 else 1) %}
+            {% set price = (donation[11] if donation|length > 11 else None) %}
+            <div class="row g-3">
+              <div class="col-md-6">
+                <label class="form-label" for="user_name">Donor name</label>
+                <input class="form-control" id="user_name" name="user_name" type="text" value="{{ donation[1] if donation|length>1 else '' }}" required>
+              </div>
+
+              <div class="col-md-6">
+                <label class="form-label" for="cloth">Cloth type</label>
+                <input class="form-control" id="cloth" name="cloth" type="text" value="{{ donation[2] if donation|length>2 else '' }}" required>
+              </div>
+
+              <div class="col-md-4">
+                <label class="form-label" for="donation_type">Listing type</label>
+                <select class="form-select" id="donation_type" name="donation_type" required>
+                  <option value="free" {% if is_free == 1 or is_free == True %}selected{% endif %}>Free</option>
+                  <option value="paid" {% if not (is_free == 1 or is_free == True) %}selected{% endif %}>Paid</option>
+                </select>
+              </div>
+
+              <div class="col-md-4" id="priceWrap">
+                <label class="form-label" for="price">Price (₹)</label>
+                <input class="form-control" id="price" name="price" type="number" min="1" step="1" value="{{ price if price is not none else '' }}">
+              </div>
+
+              <div class="col-md-4">
+                <label class="form-label" for="size">Size</label>
+                <input class="form-control" id="size" name="size" type="text" value="{{ donation[3] if donation|length>3 else '' }}" required>
+              </div>
+
+              <div class="col-md-6">
+                <label class="form-label" for="condition">Condition</label>
+                <input class="form-control" id="condition" name="condition" type="text" value="{{ donation[4] if donation|length>4 else '' }}" required>
+              </div>
+
+              <div class="col-md-6">
+                <label class="form-label" for="status">Status</label>
+                {% set status = (donation[7] if donation|length>7 else 'Pending') %}
+                <select class="form-select" id="status" name="status" required>
+                  <option value="Pending" {% if status == 'Pending' %}selected{% endif %}>Pending</option>
+                  <option value="Approved" {% if status == 'Approved' %}selected{% endif %}>Approved</option>
+                  <option value="Rejected" {% if status == 'Rejected' %}selected{% endif %}>Rejected</option>
+                </select>
+              </div>
+
+              <div class="col-12">
+                <label class="form-label" for="address">Address</label>
+                <textarea class="form-control" id="address" name="address" rows="3" required>{{ donation[5] if donation|length>5 else '' }}</textarea>
+              </div>
+
+              <div class="col-12 d-flex flex-column flex-sm-row gap-2 justify-content-between align-items-sm-center">
+                <div class="small wc-muted">Listing ID: <span class="text-white">{{ donation[0] }}</span></div>
+                <button class="btn btn-wc-accent" type="submit">Save changes</button>
+              </div>
+            </div>
+          </form>
+
+          {% if donation|length > 6 and donation[6] %}
+            <div class="mt-3 small wc-muted">
+              Current image:
+              <a class="link-light" href="{{ url_for('static', filename='uploads/' + donation[6]) }}" target="_blank" rel="noopener">View</a>
+            </div>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+{% endblock %}
+
+{% block scripts %}
+<script>
+  (function() {
+    const typeEl = document.getElementById('donation_type');
+    const priceWrap = document.getElementById('priceWrap');
+    const priceEl = document.getElementById('price');
+
+    function sync() {
+      const isPaid = (typeEl && typeEl.value === 'paid');
+      if (priceWrap) priceWrap.style.display = isPaid ? '' : 'none';
+      if (priceEl) priceEl.required = isPaid;
+      if (!isPaid && priceEl) priceEl.value = '';
+    }
+
+    if (typeEl) typeEl.addEventListener('change', sync);
+    sync();
+  })();
+</script>
+{% endblock %}

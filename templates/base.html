@@ -23,23 +23,39 @@
     <div class="collapse navbar-collapse" id="wcNav">
       <ul class="navbar-nav ms-auto align-items-lg-center gap-lg-1">
         <li class="nav-item"><a class="nav-link {% if active_page=='home' %}active{% endif %}" href="/">Home</a></li>
+        <li class="nav-item"><a class="nav-link {% if active_page=='listings' %}active{% endif %}" href="/listings">Listings</a></li>
 
         {% if session.get('user_id') %}
           <li class="nav-item"><a class="nav-link {% if active_page=='dashboard' %}active{% endif %}" href="/dashboard">Dashboard</a></li>
           {% if session.get('is_admin') %}
             <li class="nav-item"><a class="nav-link {% if active_page=='admin' %}active{% endif %}" href="/admin">Admin</a></li>
+            <li class="nav-item"><a class="nav-link" href="/admin/users">Users</a></li>
           {% endif %}
 
           <li class="nav-item ms-lg-2">
             <span class="nav-link wc-muted">Hi, {{ session.get('user_name','User') }}</span>
           </li>
           <li class="nav-item"><a class="btn btn-wc-ghost" href="/logout">Logout</a></li>
-          <li class="nav-item"><a class="btn btn-wc-accent" href="/donate">Donate</a></li>
+          {% if not session.get('is_admin') %}
+            <li class="nav-item"><a class="btn btn-wc-accent" href="/donate">Donate</a></li>
+          {% endif %}
         {% else %}
-          <li class="nav-item ms-lg-2"><a class="btn btn-wc-ghost" href="/login">Login</a></li>
-          <li class="nav-item"><a class="btn btn-wc-primary" href="/register">Create account</a></li>
-          <li class="nav-item"><a class="btn btn-wc-accent" href="/donate">Donate</a></li>
-        {% endif %}
+  <li class="nav-item ms-lg-2">
+    <a class="btn btn-wc-ghost" href="/login">User Login</a>
+  </li>
+
+  <li class="nav-item">
+    <a class="btn btn-danger" href="/admin-login">Admin Login</a>
+  </li>
+
+  <li class="nav-item">
+    <a class="btn btn-wc-primary" href="/register">Create account</a>
+  </li>
+
+  <li class="nav-item">
+    <a class="btn btn-wc-accent" href="/donate">Donate</a>
+  </li>
+{% endif %}
       </ul>
     </div>
   </div>

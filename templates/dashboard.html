@@ -19,6 +19,93 @@
     </div>
   </div>
 
+  {% if popup_notification %}
+    <div class="modal fade" id="wcNotifyModal" tabindex="-1" aria-hidden="true">
+      <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content" style="background: rgba(15,27,45,0.98); border: 1px solid rgba(255,255,255,0.12); border-radius: var(--wc-radius);">
+          <div class="modal-header" style="border-bottom: 1px solid rgba(255,255,255,0.10);">
+            <h5 class="modal-title text-white">Notification</h5>
+            <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+          </div>
+          <div class="modal-body">
+            <div class="text-white">{{ popup_notification.message }}</div>
+            {% if popup_notification.created_at %}
+              <div class="small wc-muted mt-2">{{ popup_notification.created_at }}</div>
+            {% endif %}
+          </div>
+          <div class="modal-footer" style="border-top: 1px solid rgba(255,255,255,0.10);">
+            <button type="button" class="btn btn-wc-accent" data-bs-dismiss="modal">OK</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  {% endif %}
+
+  {% if notifications is defined and notifications and notifications|length > 0 %}
+    <div class="wc-card mb-3">
+      <div class="wc-card-body">
+        <div class="fw-bold mb-2">Notifications</div>
+        <div class="d-flex flex-column gap-2">
+          {% for n in notifications %}
+            <div class="small">
+              <span class="text-white">{{ n[1] }}</span>
+              {% if n|length > 2 and n[2] %}
+                <span class="wc-muted">— {{ n[2] }}</span>
+              {% endif %}
+            </div>
+          {% endfor %}
+        </div>
+      </div>
+    </div>
+  {% endif %}
+
+  {% if incoming_requests is defined and incoming_requests and incoming_requests|length > 0 %}
+    <div class="wc-card mb-3">
+      <div class="wc-card-body">
+        <div class="fw-bold mb-2">Incoming buy/requests</div>
+        <div class="table-responsive">
+          <table class="table table-dark table-striped align-middle mb-0">
+            <thead>
+              <tr>
+                <th>Listing</th>
+                <th>Buyer</th>
+                <th>Status</th>
+                <th class="text-end">Action</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for r in incoming_requests %}
+              <tr>
+                <td class="fw-semibold">#{{ r[3] }} — {{ r[4] }} ({{ r[5] }})</td>
+                <td>{{ r[7] }}<div class="small wc-muted">{{ r[8] }}</div></td>
+                <td>
+                  {% if r[1] == 'Approved' %}
+                    <span class="badge wc-badge text-bg-success">Approved</span>
+                  {% elif r[1] == 'Rejected' %}
+                    <span class="badge wc-badge text-bg-danger">Rejected</span>
+                  {% else %}
+                    <span class="badge wc-badge text-bg-secondary">Pending</span>
+                  {% endif %}
+                </td>
+                <td class="text-end">
+                  <div class="d-flex justify-content-end gap-2">
+                    <form method="POST" action="/donor/requests/{{ r[0] }}/approve" style="display:inline;">
+                      <button class="btn btn-sm btn-wc-primary" type="submit" {% if r[1] != 'Pending' %}disabled{% endif %}>Approve</button>
+                    </form>
+                    <form method="POST" action="/donor/requests/{{ r[0] }}/reject" style="display:inline;">
+                      <button class="btn btn-sm btn-danger" type="submit" {% if r[1] != 'Pending' %}disabled{% endif %}>Reject</button>
+                    </form>
+                  </div>
+                </td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  {% endif %}
+
   {% if donations is none or donations|length == 0 %}
     <div class="wc-card">
       <div class="wc-card-body d-flex flex-column flex-md-row align-items-md-center justify-content-between gap-3">
@@ -59,6 +146,7 @@
               <th>Name</th>
               <th>Cloth</th>
               <th>Size</th>
+              <th>Type</th>
               <th>Condition</th>
               <th>Address</th>
               <th>Image</th>
@@ -71,6 +159,15 @@
               <td class="fw-semibold">{{ d[1] if d|length > 1 else '' }}</td>
               <td>{{ d[2] if d|length > 2 else '' }}</td>
               <td>{{ d[3] if d|length > 3 else '' }}</td>
+              <td>
+                {% set is_free = (d[10] if d|length > 10 else 1) %}
+                {% set price = (d[11] if d|length > 11 else None) %}
+                {% if is_free == 1 or is_free == True %}
+                  <span class="badge wc-badge text-bg-success">Free</span>
+                {% else %}
+                  <span class="badge wc-badge text-bg-warning">Paid{% if price %} • ₹{{ price }}{% endif %}</span>
+                {% endif %}
+              </td>
               <td>{{ d[4] if d|length > 4 else '' }}</td>
               <td>{{ d[5] if d|length > 5 else '' }}</td>
               <td>
@@ -134,6 +231,18 @@
       }
     });
   }
+</script>
+{% endif %}
+
+{% if popup_notification %}
+<script>
+  document.addEventListener('DOMContentLoaded', function () {
+    const el = document.getElementById('wcNotifyModal');
+    if (el && window.bootstrap) {
+      const modal = new bootstrap.Modal(el);
+      modal.show();
+    }
+  });
 </script>
 {% endif %}
 {% endblock %}

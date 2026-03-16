@@ -38,13 +38,31 @@
             {% endif %}
             <div class="row g-3">
               <div class="col-md-6">
-                <label class="form-label" for="name">Name</label>
-                <input class="form-control" id="name" type="text" name="name" value="{{ session.user_name or '' }}" readonly>
+              <label class="form-label" for="name">Name</label>
+              <input class="form-control" id="name" type="text" name="name" value="{{ session.user_name or '' }}" placeholder="Enter your name" required>
               </div>
 
               <div class="col-md-6">
                 <label class="form-label" for="cloth">Cloth type</label>
                 <input class="form-control" id="cloth" type="text" name="cloth" placeholder="Shirts, jeans, jackets..." required>
+              </div>
+
+              <div class="col-md-4">
+                <label class="form-label" for="donation_type">Listing type</label>
+                <select class="form-select" id="donation_type" name="donation_type" required>
+                  <option value="free" selected>Free (Donate)</option>
+                  <option value="paid">Paid (Second-hand sale)</option>
+                </select>
+              </div>
+
+              <div class="col-md-4" id="priceWrap" style="display:none;">
+                <label class="form-label" for="price">Price (₹)</label>
+                <input class="form-control" id="price" type="number" name="price" min="1" step="1" placeholder="Enter price">
+              </div>
+
+              <div class="col-md-4">
+                <label class="form-label" for="phone">Phone (shared only after approval)</label>
+                <input class="form-control" id="phone" type="tel" name="phone" placeholder="e.g. 9876543210" required>
               </div>
 
               <div class="col-md-4">
@@ -86,4 +104,24 @@
     </div>
   </div>
 </section>
+{% endblock %}
+
+{% block scripts %}
+<script>
+  (function() {
+    const typeEl = document.getElementById('donation_type');
+    const priceWrap = document.getElementById('priceWrap');
+    const priceEl = document.getElementById('price');
+
+    function sync() {
+      const isPaid = (typeEl && typeEl.value === 'paid');
+      if (priceWrap) priceWrap.style.display = isPaid ? '' : 'none';
+      if (priceEl) priceEl.required = isPaid;
+      if (!isPaid && priceEl) priceEl.value = '';
+    }
+
+    if (typeEl) typeEl.addEventListener('change', sync);
+    sync();
+  })();
+</script>
 {% endblock %}

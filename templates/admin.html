@@ -10,6 +10,7 @@
       <p class="wc-lead mb-0">Review donations and update approval status.</p>
     </div>
     <div class="d-flex gap-2">
+      <a href="/admin/users" class="btn btn-wc-ghost">Users</a>
       <a href="/dashboard" class="btn btn-wc-ghost">Dashboard</a>
       <a href="/" class="btn btn-wc-ghost">Home</a>
     </div>
@@ -18,13 +19,14 @@
   <div class="wc-card">
     <div class="wc-card-body">
       <div class="table-responsive">
-        <table class="table table-striped align-middle mb-0">
+        <table class="table table-dark table-striped align-middle mb-0">
           <thead>
             <tr>
               <th>ID</th>
               <th>Name</th>
               <th>Cloth</th>
               <th>Size</th>
+              <th>Type</th>
               <th>Status</th>
               <th class="text-end">Action</th>
             </tr>
@@ -32,12 +34,21 @@
           <tbody>
             {% for d in donations %}
             <tr>
-              <td class="wc-muted">{{ d[0] }}</td>
-              <td class="fw-semibold">{{ d[1] }}</td>
-              <td>{{ d[2] }}</td>
-              <td>{{ d[3] }}</td>
+              <td class="wc-muted">{{ d[0] if d|length > 0 else '' }}</td>
+              <td class="fw-semibold">{{ d[1] if d|length > 1 else '' }}</td>
+              <td>{{ d[2] if d|length > 2 else '' }}</td>
+              <td>{{ d[3] if d|length > 3 else '' }}</td>
               <td>
-                {% set status = d[7] %}
+                {% set is_free = (d[10] if d|length > 10 else 1) %}
+                {% set price = (d[11] if d|length > 11 else None) %}
+                {% if is_free == 1 or is_free == True %}
+                  <span class="badge wc-badge text-bg-success">Free</span>
+                {% else %}
+                  <span class="badge wc-badge text-bg-warning">Paid{% if price %} • ₹{{ price }}{% endif %}</span>
+                {% endif %}
+              </td>
+              <td>
+                {% set status = (d[7] if d|length > 7 else 'Pending') %}
                 {% if status == 'Approved' %}
                   <span class="badge wc-badge text-bg-success">Approved</span>
                 {% elif status == 'Rejected' %}
@@ -48,10 +59,18 @@
               </td>
               <td class="text-end">
                 <div class="d-flex justify-content-end gap-2">
-                  <a href="/approve/{{ d[0] }}" class="btn btn-sm btn-wc-primary">Approve</a>
-                  <a href="/reject/{{ d[0] }}" class="btn btn-sm btn-danger">Reject</a>
+                  <a href="/admin/donations/{{ d[0] if d|length > 0 else '' }}/edit" class="btn btn-sm btn-wc-ghost">Edit</a>
+                  <a href="/approve/{{ d[0] if d|length > 0 else '' }}" class="btn btn-sm btn-wc-primary">Approve</a>
+                  <a href="/reject/{{ d[0] if d|length > 0 else '' }}" class="btn btn-sm btn-danger">Reject</a>
+                  <form method="POST" action="/admin/donations/{{ d[0] if d|length > 0 else '' }}/delete" style="display:inline;">
+                    <button type="submit" class="btn btn-sm btn-danger" onclick="return confirm('Delete this listing?')">Delete</button>
+                  </form>
                 </div>
               </td>
+            </tr>
+            {% else %}
+            <tr>
+              <td colspan="7" class="text-center wc-muted">No donations found.</td>
             </tr>
             {% endfor %}
           </tbody>

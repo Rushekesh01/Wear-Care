@@ -1,0 +1,58 @@
+{% extends 'base.html' %}
+
+{% block title %}Admin Users — Wear & Care{% endblock %}
+
+{% block content %}
+<section class="wc-section pt-0">
+  <div class="d-flex flex-column flex-md-row align-items-md-end justify-content-between gap-2 mb-4">
+    <div>
+      <h1 class="h2 fw-bold wc-title mb-2">Admin: Users</h1>
+      <p class="wc-lead mb-0">View, edit, or delete any user.</p>
+    </div>
+    <div class="d-flex gap-2">
+      <a href="/admin" class="btn btn-wc-ghost">Donations</a>
+      <a href="/" class="btn btn-wc-ghost">Home</a>
+    </div>
+  </div>
+
+  <div class="wc-card">
+    <div class="wc-card-body">
+      <div class="table-responsive">
+        <table class="table table-dark table-striped align-middle mb-0">
+          <thead>
+            <tr>
+              <th>ID</th>
+              <th>Name</th>
+              <th>Email</th>
+              <th>Created</th>
+              <th class="text-end">Action</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for u in users %}
+            <tr>
+              <td class="wc-muted">{{ u[0] }}</td>
+              <td class="fw-semibold">{{ u[1] }}</td>
+              <td>{{ u[2] }}</td>
+              <td class="wc-muted">{{ u[3] if u|length > 3 and u[3] else '—' }}</td>
+              <td class="text-end">
+                <div class="d-flex justify-content-end gap-2">
+                  <a href="/admin/users/{{ u[0] }}/edit" class="btn btn-sm btn-wc-primary">Edit</a>
+                  <form method="POST" action="/admin/users/{{ u[0] }}/delete" style="display:inline;">
+                    <button type="submit" class="btn btn-sm btn-danger" onclick="return confirm('Delete this user?')">Delete</button>
+                  </form>
+                </div>
+              </td>
+            </tr>
+            {% else %}
+            <tr>
+              <td colspan="5" class="text-center wc-muted">No users found.</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</section>
+{% endblock %}

@@ -13,16 +13,16 @@
 <div class="alert alert-danger">{{ error }}</div>
 {% endif %}
 
-<form method="POST">
+<form method="POST" autocomplete="off" novalidate>
 
 <div class="mb-3">
 <label>Email</label>
-<input type="email" name="email" class="form-control">
+<input type="email" name="email" class="form-control" autocomplete="off" autocapitalize="off" spellcheck="false">
 </div>
 
 <div class="mb-3">
 <label>Password</label>
-<input type="password" name="password" class="form-control">
+<input type="password" name="password" class="form-control" autocomplete="new-password" autocapitalize="off" spellcheck="false">
 </div>
 
 <button class="btn btn-wc-primary w-100">Login</button>
@@ -32,4 +32,17 @@
 </div>
 </div>
 
+{% endblock %}
+
+{% block scripts %}
+<script>
+  document.addEventListener('DOMContentLoaded', function() {
+    const email = document.querySelector('input[name="email"]');
+    const pass = document.querySelector('input[name="password"]');
+    setTimeout(function () {
+      if (email) email.value = '';
+      if (pass) pass.value = '';
+    }, 0);
+  });
+</script>
 {% endblock %}

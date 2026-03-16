@@ -17,6 +17,7 @@ CREATE TABLE users(
 -- Donations table
 CREATE TABLE donations(
     id INT AUTO_INCREMENT PRIMARY KEY,
+    user_id INT NULL,
     user_name VARCHAR(100) NOT NULL,
     cloth_type VARCHAR(50) NOT NULL,
     size VARCHAR(20) NOT NULL,
@@ -24,8 +25,29 @@ CREATE TABLE donations(
     address TEXT NOT NULL,
     image VARCHAR(200),
     status VARCHAR(50) DEFAULT 'Pending',
+    is_free TINYINT(1) NOT NULL DEFAULT 1,
+    price DECIMAL(10,2) NULL,
+    phone VARCHAR(30) NULL,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+);
+
+-- Notifications table (for approval/rejection updates)
+CREATE TABLE notifications(
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    user_id INT NOT NULL,
+    message VARCHAR(255) NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    read_at TIMESTAMP NULL
+);
+
+-- Purchase requests (buyer -> donor approval)
+CREATE TABLE purchase_requests(
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    donation_id INT NOT NULL,
+    buyer_user_id INT NOT NULL,
+    status VARCHAR(20) NOT NULL DEFAULT 'Pending',
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
 -- Create a test user (password: password123)
