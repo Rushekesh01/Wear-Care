@@ -63,9 +63,9 @@ body{
 
 /* Navbar */
 .navbar.wc-navbar{
-  background: rgba(10,16,28,0.55) !important;
-  backdrop-filter: blur(14px);
-  border-bottom: 1px solid rgba(255,255,255,0.08);
+  background: rgba(10,16,28,0.7) !important;
+  backdrop-filter: blur(12px);
+  border-bottom: 1px solid rgba(255,255,255,0.12);
 }
 
 .wc-brand{
@@ -89,17 +89,18 @@ body{
 /* Buttons */
 .btn{
   border-radius: 999px;
-  padding: .65rem 1.05rem;
+  padding: .7rem 1.2rem;
   font-weight: 600;
-  transition: transform .15s ease, box-shadow .15s ease, background-color .15s ease, border-color .15s ease;
+  transition: all 0.25s ease;
+}
+
+.btn:hover{
+  transform: translateY(-2px);
+  box-shadow: 0 8px 20px rgba(0,0,0,0.3);
 }
 
 .btn:focus{
   box-shadow: var(--wc-focus) !important;
-}
-
-.btn:hover{
-  transform: translateY(-1px);
 }
 
 .btn-wc-primary{
@@ -135,12 +136,47 @@ body{
   color: #ffffff;
 }
 
+/* Approve and Reject buttons */
+.btn-approve{
+  background: linear-gradient(135deg, #28a745, #34ce57);
+  border: 1px solid rgba(255,255,255,0.14);
+  color: #ffffff;
+  font-weight: 600;
+}
+
+.btn-approve:hover{
+  background: linear-gradient(135deg, #218838, #28a745);
+  box-shadow: 0 10px 22px rgba(40,167,69,0.25);
+  color: #ffffff;
+}
+
+.btn-reject{
+  background: linear-gradient(135deg, #dc3545, #e74c3c);
+  border: 1px solid rgba(255,255,255,0.14);
+  color: #ffffff;
+  font-weight: 600;
+}
+
+.btn-reject:hover{
+  background: linear-gradient(135deg, #c82333, #dc3545);
+  box-shadow: 0 10px 22px rgba(220,53,69,0.25);
+  color: #ffffff;
+}
+
 /* Cards */
 .wc-card{
-  background: var(--wc-card);
-  border: 1px solid var(--wc-card-border);
+  background: rgba(255,255,255,0.06);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  border: 1px solid rgba(255,255,255,0.12);
   border-radius: var(--wc-radius);
-  box-shadow: var(--wc-shadow-soft);
+  box-shadow: 0 10px 30px rgba(0,0,0,0.35);
+  transition: all 0.3s ease;
+}
+
+.wc-card:hover{
+  transform: translateY(-5px) scale(1.01);
+  box-shadow: 0 20px 50px rgba(0,0,0,0.5);
 }
 
 .wc-card-header{
@@ -173,6 +209,16 @@ body{
     url("https://images.unsplash.com/photo-1521335629791-ce4aec67dd49?auto=format&fit=crop&w=1600&q=60");
   background-size: cover;
   background-position: center;
+}
+
+.wc-hero::after{
+  content: "";
+  position: absolute;
+  width: 400px;
+  height: 400px;
+  background: radial-gradient(circle, rgba(91,140,255,0.4), transparent);
+  top: -100px;
+  right: -100px;
 }
 
 .wc-hero-inner{
@@ -311,4 +357,19 @@ body{
 
 .table-dark tbody tr {
   border-color: rgba(255,255,255,0.1);
+}
+
+.fade-in{
+  animation: fadeIn 0.8s ease-in-out;
+}
+
+@keyframes fadeIn{
+  from{
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to{
+    opacity: 1;
+    transform: translateY(0);
+  }
 }

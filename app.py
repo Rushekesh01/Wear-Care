@@ -18,7 +18,7 @@ def get_db():
         host="localhost",
         user="root",
         password="",
-        database="Wear&Care"
+        database="wearcare"
     )
 
 
@@ -55,7 +55,7 @@ def normalize_email(email):
 # HOME
 @app.route('/')
 def home():
-    return render_template("index.html", active_page="home")
+    return render_template("index.html", active_page="home", user_id=session.get("user_id"))
 
 
 # REGISTER
@@ -301,6 +301,25 @@ def dashboard():
     except mysql.connector.Error:
         incoming_requests = []
 
+    my_requests = []
+    try:
+        cursor.execute(
+            """
+            SELECT pr.id, pr.status, pr.created_at,
+                   d.id, d.cloth_type, d.size, d.condition_status,
+                   du.name, du.email
+            FROM purchase_requests pr
+            JOIN donations d ON d.id = pr.donation_id
+            JOIN users du ON du.id = d.user_id
+            WHERE pr.buyer_user_id = %s
+            ORDER BY pr.id DESC
+            """,
+            (session.get("user_id"),)
+        )
+        my_requests = cursor.fetchall()
+    except mysql.connector.Error:
+        my_requests = []
+
     cursor.close()
     db.close()
 
@@ -309,6 +328,7 @@ def dashboard():
         donations=data,
         notifications=notifications,
         incoming_requests=incoming_requests,
+        my_requests=my_requests,
         popup_notification=popup_notification
     )
 
@@ -336,13 +356,49 @@ def listings():
     db = get_db()
     cursor = db.cursor()
 
-    cursor.execute("SELECT * FROM donations ORDER BY id DESC")
+    # Show only donations from OTHER users (not your own)
+    user_id = session.get("user_id")
+    if user_id and not session.get("is_admin"):
+        cursor.execute("SELECT * FROM donations WHERE user_id != %s OR user_id IS NULL ORDER BY id DESC", (user_id,))
+    else:
+        cursor.execute("SELECT * FROM donations ORDER BY id DESC")
     data = cursor.fetchall()
 
     cursor.close()
     db.close()
 
     return render_template("listings.html", donations=data, active_page="listings")
+
+
+@app.route('/requests')
+@login_required
+def requests_page():
+    db = get_db()
+    cursor = db.cursor()
+
+    incoming_requests = []
+    try:
+        cursor.execute(
+            """
+            SELECT pr.id, pr.status, pr.created_at,
+                   d.id, d.cloth_type, d.size, d.condition_status,
+                   u.name, u.email
+            FROM purchase_requests pr
+            JOIN donations d ON d.id = pr.donation_id
+            JOIN users u ON u.id = pr.buyer_user_id
+            WHERE d.user_id = %s
+            ORDER BY pr.id DESC
+            """,
+            (session.get("user_id"),)
+        )
+        incoming_requests = cursor.fetchall()
+    except mysql.connector.Error:
+        incoming_requests = []
+
+    cursor.close()
+    db.close()
+
+    return render_template("requests.html", incoming_requests=incoming_requests, active_page="requests")
 
 
 # ADMIN: USERS LIST
@@ -539,16 +595,17 @@ def request_listing(donation_id):
     cursor.execute("SELECT * FROM donations WHERE id=%s", (donation_id,))
     d = cursor.fetchone()
 
-    cursor.close()
-    db.close()
-
     if not d:
+        cursor.close()
+        db.close()
         flash("Listing not found.", "warning")
         return redirect("/listings")
 
     status = d[7] if len(d) > 7 else "Pending"
     image = d[6] if len(d) > 6 else ""
     if status == "Rejected":
+        cursor.close()
+        db.close()
         flash("This listing is rejected and not available.", "warning")
         return redirect("/listings")
 
@@ -562,64 +619,27 @@ def request_listing(donation_id):
     except Exception:
         is_free = True
 
+    # Check if request already exists
     request_status = None
+    request_sent = False
     try:
-        cursor2 = get_db().cursor()
-    except Exception:
-        cursor2 = None
+        cursor.execute(
+            "SELECT status FROM purchase_requests WHERE donation_id=%s AND buyer_user_id=%s ORDER BY id DESC LIMIT 1",
+            (donation_id, session.get("user_id"))
+        )
+        existing = cursor.fetchone()
+        if existing:
+            request_sent = True
+            request_status = existing[0]
+    except mysql.connector.Error:
+        pass
 
-    if cursor2:
-        try:
-            # create request if not exists
-            cursor2.execute(
-                "SELECT id,status FROM purchase_requests WHERE donation_id=%s AND buyer_user_id=%s ORDER BY id DESC LIMIT 1",
-                (donation_id, session.get("user_id"))
-            )
-            existing = cursor2.fetchone()
-            if existing:
-                request_status = existing[1]
-            else:
-                cursor2.execute(
-                    "INSERT INTO purchase_requests(donation_id,buyer_user_id,status) VALUES(%s,%s,%s)",
-                    (donation_id, session.get("user_id"), "Pending")
-                )
-                # Notify buyer + donor
-                try:
-                    cursor2.execute(
-                        "INSERT INTO notifications(user_id, message) VALUES(%s,%s)",
-                        (session.get("user_id"), f"Your request for listing #{donation_id} has been sent to the donor for approval.")
-                    )
-                except mysql.connector.Error:
-                    pass
-
-                try:
-                    donor_user_id = d[0]  # placeholder
-                    # donation.user_id exists at index 1? depends on schema; safer query
-                    cursor2.execute("SELECT user_id FROM donations WHERE id=%s", (donation_id,))
-                    donor_row = cursor2.fetchone()
-                    donor_user_id = donor_row[0] if donor_row else None
-                    if donor_user_id:
-                        cursor2.execute(
-                            "INSERT INTO notifications(user_id, message) VALUES(%s,%s)",
-                            (donor_user_id, f"You received a new request for listing #{donation_id}. Approve or Reject from your Dashboard.")
-                        )
-                except mysql.connector.Error:
-                    pass
-
-                request_status = "Pending"
-                cursor2.connection.commit()
-        except mysql.connector.Error:
-            # if purchase_requests/notifications tables aren't present yet, page still loads
-            request_status = "Pending"
-        finally:
-            try:
-                cursor2.close()
-                cursor2.connection.close()
-            except Exception:
-                pass
+    cursor.close()
+    db.close()
 
     return render_template(
         "request.html",
+        donation_id=donation_id,
         donor_name=d[1] if len(d) > 1 else "",
         cloth=d[2] if len(d) > 2 else "",
         size=d[3] if len(d) > 3 else "",
@@ -628,9 +648,75 @@ def request_listing(donation_id):
         image=image,
         is_free=is_free,
         price=price,
+        request_sent=request_sent,
         request_status=request_status,
-        phone=phone if status == "Approved" and request_status == "Approved" else None
+        phone=phone if request_status == "Approved" else None
     )
+
+
+@app.route('/send-request/<int:donation_id>', methods=['POST'])
+@login_required
+def send_request(donation_id):
+    if session.get("is_admin"):
+        return redirect("/admin")
+
+    db = get_db()
+    cursor = db.cursor()
+
+    cursor.execute("SELECT * FROM donations WHERE id=%s", (donation_id,))
+    d = cursor.fetchone()
+
+    if not d:
+        cursor.close()
+        db.close()
+        flash("Listing not found.", "warning")
+        return redirect("/listings")
+
+    # Check if request already exists
+    cursor.execute(
+        "SELECT id FROM purchase_requests WHERE donation_id=%s AND buyer_user_id=%s",
+        (donation_id, session.get("user_id"))
+    )
+    if cursor.fetchone():
+        cursor.close()
+        db.close()
+        flash("You have already requested this item.", "info")
+        return redirect(f"/request/{donation_id}")
+
+    # Create the request
+    cursor.execute(
+        "INSERT INTO purchase_requests(donation_id,buyer_user_id,status) VALUES(%s,%s,%s)",
+        (donation_id, session.get("user_id"), "Pending")
+    )
+
+    # Notify buyer
+    try:
+        cursor.execute(
+            "INSERT INTO notifications(user_id, message) VALUES(%s,%s)",
+            (session.get("user_id"), f"Your request for listing #{donation_id} has been sent to the donor for approval.")
+        )
+    except mysql.connector.Error:
+        pass
+
+    # Notify donor
+    try:
+        cursor.execute("SELECT user_id FROM donations WHERE id=%s", (donation_id,))
+        donor_row = cursor.fetchone()
+        donor_user_id = donor_row[0] if donor_row else None
+        if donor_user_id:
+            cursor.execute(
+                "INSERT INTO notifications(user_id, message) VALUES(%s,%s)",
+                (donor_user_id, f"You received a new request for listing #{donation_id}. Approve or Reject from your Requests page.")
+            )
+    except mysql.connector.Error:
+        pass
+
+    db.commit()
+    cursor.close()
+    db.close()
+
+    flash("Request sent successfully!", "success")
+    return redirect(f"/request/{donation_id}")
 
 
 @app.route('/donor/requests/<int:request_id>/approve', methods=['POST'])

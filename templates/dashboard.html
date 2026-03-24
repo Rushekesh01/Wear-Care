@@ -15,6 +15,7 @@
     </div>
     <div class="d-flex gap-2">
       <a href="/donate" class="btn btn-wc-accent">New donation</a>
+      <a href="/requests" class="btn btn-wc-primary">Requests</a>
       <a href="/" class="btn btn-wc-ghost">Home</a>
     </div>
   </div>
@@ -59,10 +60,50 @@
     </div>
   {% endif %}
 
+  {% if my_requests is defined and my_requests and my_requests|length > 0 %}
+    <div class="wc-card mb-3">
+      <div class="wc-card-body">
+        <div class="fw-bold mb-2">My requests (items I requested)</div>
+        <div class="table-responsive">
+          <table class="table table-dark table-striped align-middle mb-0">
+            <thead>
+              <tr>
+                <th>Listing</th>
+                <th>Donor</th>
+                <th>Status</th>
+                <th class="text-end">Action</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for r in my_requests %}
+              <tr>
+                <td class="fw-semibold">#{{ r[3] }} — {{ r[4] }} ({{ r[5] }})</td>
+                <td>{{ r[7] }}<div class="small wc-muted">{{ r[8] }}</div></td>
+                <td>
+                  {% if r[1] == 'Approved' %}
+                    <span class="badge wc-badge text-bg-success">Approved</span>
+                  {% elif r[1] == 'Rejected' %}
+                    <span class="badge wc-badge text-bg-danger">Rejected</span>
+                  {% else %}
+                    <span class="badge wc-badge text-bg-secondary">Pending</span>
+                  {% endif %}
+                </td>
+                <td class="text-end">
+                  <a class="btn btn-sm btn-wc-ghost" href="/request/{{ r[3] }}">View</a>
+                </td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  {% endif %}
+
   {% if incoming_requests is defined and incoming_requests and incoming_requests|length > 0 %}
     <div class="wc-card mb-3">
       <div class="wc-card-body">
-        <div class="fw-bold mb-2">Incoming buy/requests</div>
+        <div class="fw-bold mb-2">Incoming buy/requests (requests for my items)</div>
         <div class="table-responsive">
           <table class="table table-dark table-striped align-middle mb-0">
             <thead>
@@ -90,10 +131,10 @@
                 <td class="text-end">
                   <div class="d-flex justify-content-end gap-2">
                     <form method="POST" action="/donor/requests/{{ r[0] }}/approve" style="display:inline;">
-                      <button class="btn btn-sm btn-wc-primary" type="submit" {% if r[1] != 'Pending' %}disabled{% endif %}>Approve</button>
+                      <button class="btn btn-sm btn-approve" type="submit" {% if r[1] != 'Pending' %}disabled{% endif %}>Approve</button>
                     </form>
                     <form method="POST" action="/donor/requests/{{ r[0] }}/reject" style="display:inline;">
-                      <button class="btn btn-sm btn-danger" type="submit" {% if r[1] != 'Pending' %}disabled{% endif %}>Reject</button>
+                      <button class="btn btn-sm btn-reject" type="submit" {% if r[1] != 'Pending' %}disabled{% endif %}>Reject</button>
                     </form>
                   </div>
                 </td>
@@ -123,7 +164,7 @@
       <div class="wc-card">
         <div class="wc-card-body">
           <div class="small wc-muted">Total donations</div>
-          <div class="h2 fw-bold mb-0">{{ donations|length }}</div>
+          <div class="h2 fw-bold mb-0" id="donationCount">{{ donations|length }}</div>
         </div>
       </div>
     </div>
@@ -204,33 +245,37 @@
 {% block scripts %}
 {% if donations is not none and donations|length != 0 %}
 <script>
-  const ctx = document.getElementById('donationChart');
-  if (ctx) {
-    new Chart(ctx, {
-      type: 'bar',
-      data: {
-        labels: ['Total Donations'],
-        datasets: [{
-          label: 'Donations',
-          data: [{{ donations|length }}],
-          backgroundColor: ['rgba(91, 140, 255, 0.85)'],
-          borderColor: ['rgba(255,255,255,0.15)'],
-          borderWidth: 1,
-          borderRadius: 10
-        }]
-      },
-      options: {
-        responsive: true,
-        plugins: {
-          legend: { labels: { color: 'rgba(234,240,255,0.85)' } }
+  (function() {
+    var countEl = document.getElementById('donationCount');
+    var donationCount = countEl ? parseInt(countEl.textContent) : 0;
+    var ctx = document.getElementById('donationChart');
+    if (ctx) {
+      new Chart(ctx, {
+        type: 'bar',
+        data: {
+          labels: ['Total Donations'],
+          datasets: [{
+            label: 'Donations',
+            data: [donationCount],
+            backgroundColor: ['rgba(91, 140, 255, 0.85)'],
+            borderColor: ['rgba(255,255,255,0.15)'],
+            borderWidth: 1,
+            borderRadius: 10
+          }]
         },
-        scales: {
-          x: { ticks: { color: 'rgba(234,240,255,0.75)' }, grid: { color: 'rgba(255,255,255,0.08)' } },
-          y: { ticks: { color: 'rgba(234,240,255,0.75)' }, grid: { color: 'rgba(255,255,255,0.08)' }, beginAtZero: true }
+        options: {
+          responsive: true,
+          plugins: {
+            legend: { labels: { color: 'rgba(234,240,255,0.85)' } }
+          },
+          scales: {
+            x: { ticks: { color: 'rgba(234,240,255,0.75)' }, grid: { color: 'rgba(255,255,255,0.08)' } },
+            y: { ticks: { color: 'rgba(234,240,255,0.75)' }, grid: { color: 'rgba(255,255,255,0.08)' }, beginAtZero: true }
+          }
         }
-      }
-    });
-  }
+      });
+    }
+  })();
 </script>
 {% endif %}
 

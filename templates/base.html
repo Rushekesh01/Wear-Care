@@ -40,22 +40,13 @@
             <li class="nav-item"><a class="btn btn-wc-accent" href="/donate">Donate</a></li>
           {% endif %}
         {% else %}
-  <li class="nav-item ms-lg-2">
-    <a class="btn btn-wc-ghost" href="/login">User Login</a>
-  </li>
-
-  <li class="nav-item">
-    <a class="btn btn-danger" href="/admin-login">Admin Login</a>
-  </li>
-
-  <li class="nav-item">
-    <a class="btn btn-wc-primary" href="/register">Create account</a>
-  </li>
-
-  <li class="nav-item">
-    <a class="btn btn-wc-accent" href="/donate">Donate</a>
-  </li>
-{% endif %}
+          <li class="nav-item ms-lg-2">
+            <a class="btn btn-wc-ghost" href="/login">Login</a>
+          </li>
+          <li class="nav-item">
+            <a class="btn btn-wc-primary" href="/register">Register</a>
+          </li>
+        {% endif %}
       </ul>
     </div>
   </div>
@@ -83,7 +74,12 @@
 <footer class="wc-footer">
   <div class="container wc-container py-4 d-flex flex-column flex-md-row gap-2 align-items-md-center justify-content-between">
     <div class="small wc-muted">© 2026 Wear &amp; Care — Clothing Donation Initiative</div>
-    <div class="small wc-muted">Built with care for donors and NGOs.</div>
+    <div class="small wc-muted">
+      Built with care for donors and NGOs.
+      {% if not session.get('user_id') %}
+        <a href="/admin-login" class="text-muted ms-2" style="text-decoration: none; opacity: 0.6;">Admin</a>
+      {% endif %}
+    </div>
   </div>
 </footer>
 

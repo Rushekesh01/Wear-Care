@@ -6,8 +6,8 @@
 <section class="wc-section pt-0">
   <div class="d-flex flex-column flex-md-row align-items-md-end justify-content-between gap-2 mb-4">
     <div>
-      <h1 class="h2 fw-bold wc-title mb-2">Listings</h1>
-      <p class="wc-lead mb-0">Browse available donated &amp; second-hand clothing.</p>
+      <h1 class="h2 fw-bold wc-title mb-2">Browse Listings</h1>
+      <p class="wc-lead mb-0">Find items donated by others. You cannot buy your own donations.</p>
     </div>
     {% if session.get('user_id') and not session.get('is_admin') %}
       <a class="btn btn-wc-accent" href="/donate">Post an item</a>
@@ -18,8 +18,8 @@
     <div class="wc-card">
       <div class="wc-card-body d-flex flex-column flex-md-row align-items-md-center justify-content-between gap-3">
         <div>
-          <div class="h4 fw-bold mb-1">No listings yet</div>
-          <div class="wc-muted">Be the first to add an item.</div>
+          <div class="h4 fw-bold mb-1">No listings available</div>
+          <div class="wc-muted">No items from other donors right now. Check back later!</div>
         </div>
         {% if session.get('user_id') and not session.get('is_admin') %}
           <a class="btn btn-wc-accent" href="/donate">Create listing</a>
@@ -66,13 +66,20 @@
               {% endif %}
               {% set can_request = (status != 'Rejected') %}
               {% if not session.get('user_id') %}
-                <a class="btn btn-wc-primary btn-sm" href="/register">Buy / Request</a>
+                <a class="btn btn-wc-accent btn-sm" href="/register">Buy</a>
+                <a class="btn btn-wc-primary btn-sm" href="/register">Request</a>
               {% elif session.get('is_admin') %}
-                <span class="btn btn-wc-primary btn-sm disabled">Buy / Request</span>
+                <span class="btn btn-wc-accent btn-sm disabled">Buy</span>
+                <span class="btn btn-wc-primary btn-sm disabled">Request</span>
               {% elif can_request %}
-                <a class="btn btn-wc-primary btn-sm" href="/request/{{ d[0] if d|length > 0 else '' }}">Buy / Request</a>
+                {% if is_free == 1 or is_free == True %}
+                  <a class="btn btn-wc-primary btn-sm" href="/request/{{ d[0] if d|length > 0 else '' }}">Request</a>
+                {% else %}
+                  <a class="btn btn-wc-accent btn-sm" href="/request/{{ d[0] if d|length > 0 else '' }}">Buy</a>
+                {% endif %}
               {% else %}
-                <span class="btn btn-wc-primary btn-sm disabled">Buy / Request</span>
+                <span class="btn btn-wc-accent btn-sm disabled">Buy</span>
+                <span class="btn btn-wc-primary btn-sm disabled">Request</span>
               {% endif %}
             </div>
           </div>

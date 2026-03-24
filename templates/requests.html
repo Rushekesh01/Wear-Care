@@ -1,0 +1,82 @@
+{% extends 'base.html' %}
+
+{% block title %}Requests — Wear & Care{% endblock %}
+
+{% block content %}
+<section class="wc-section pt-0">
+  <div class="d-flex flex-column flex-md-row align-items-md-end justify-content-between gap-2 mb-4">
+    <div>
+      <h1 class="h2 fw-bold wc-title mb-2">Requests</h1>
+      <p class="wc-lead mb-0">Manage requests for your donated items.</p>
+    </div>
+    <div class="d-flex gap-2">
+      <a href="/dashboard" class="btn btn-wc-ghost">Back to Dashboard</a>
+    </div>
+  </div>
+
+  {% if incoming_requests is defined and incoming_requests and incoming_requests|length > 0 %}
+    <div class="wc-card">
+      <div class="wc-card-body">
+        <div class="fw-bold mb-3">Incoming Requests for Your Items</div>
+        <div class="table-responsive">
+          <table class="table table-dark table-striped align-middle mb-0">
+            <thead>
+              <tr>
+                <th>Item</th>
+                <th>Requested By</th>
+                <th>Date</th>
+                <th>Status</th>
+                <th class="text-end">Action</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for r in incoming_requests %}
+              <tr>
+                <td class="fw-semibold">
+                  {{ r[4] }} ({{ r[5] }})
+                  <div class="small wc-muted">Condition: {{ r[6] }}</div>
+                </td>
+                <td>
+                  {{ r[7] }}
+                  <div class="small wc-muted">{{ r[8] }}</div>
+                </td>
+                <td>{{ r[2] }}</td>
+                <td>
+                  {% if r[1] == 'Approved' %}
+                    <span class="badge wc-badge text-bg-success">Approved</span>
+                  {% elif r[1] == 'Rejected' %}
+                    <span class="badge wc-badge text-bg-danger">Rejected</span>
+                  {% else %}
+                    <span class="badge wc-badge text-bg-secondary">Pending</span>
+                  {% endif %}
+                </td>
+                <td class="text-end">
+                  <div class="d-flex justify-content-end gap-2">
+                    <form method="POST" action="/donor/requests/{{ r[0] }}/approve" style="display:inline;">
+                      <button class="btn btn-sm btn-approve" type="submit" {% if r[1] != 'Pending' %}disabled{% endif %}>Approve</button>
+                    </form>
+                    <form method="POST" action="/donor/requests/{{ r[0] }}/reject" style="display:inline;">
+                      <button class="btn btn-sm btn-reject" type="submit" {% if r[1] != 'Pending' %}disabled{% endif %}>Reject</button>
+                    </form>
+                  </div>
+                </td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  {% else %}
+    <div class="wc-card">
+      <div class="wc-card-body d-flex flex-column flex-md-row align-items-md-center justify-content-between gap-3">
+        <div>
+          <div class="h4 fw-bold mb-1">No requests yet</div>
+          <div class="wc-muted">When someone requests your donated items, they will appear here.</div>
+        </div>
+        <a class="btn btn-wc-accent" href="/listings">Browse Listings</a>
+      </div>
+    </div>
+  {% endif %}
+</section>
+{% endblock %}
