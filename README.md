@@ -34,6 +34,14 @@ Team Members:
 2.	Bhumika Shivaji Patil (SY-DS-88-241106098)
 3.	Harshada Jagdish More (SY-DS-93-241106093)
 4.	Prachi Anil Mahajan (SY-DS-82-241106087)
- 
-
-
+Guide Name: Pathak sir
+Date                       work
+15 feb 2026                Semester project start
+22 feb 2026                Project topic finalization
+28 feb 2026                Project Interaction with Guide(Abstract)
+3 mar 2026                 Implementation Progress - 1
+                           Front-end 1st/2nd page
+  	                       Admin login page
+9 mar 2026                 Monitoring - 1
+18 mar 2026                Implementation progress - 2
+  	                       Invitation 
