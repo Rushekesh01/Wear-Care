@@ -1,9 +1,47 @@
-from flask import Flask, render_template, request, redirect, session, flash
-import mysql.connector
+from flask import Flask, render_template, request, redirect, session, flash # type: ignore
 import os
+import smtplib
+import random
+import time
+from email.mime.text import MIMEText
+from email.mime.multipart import MIMEMultipart
 from functools import wraps
-from werkzeug.security import generate_password_hash, check_password_hash
-from werkzeug.utils import secure_filename
+from werkzeug.utils import secure_filename # type: ignore
+from dotenv import load_dotenv # type: ignore
+
+from supabase import create_client, Client # type: ignore
+
+load_dotenv()
+url = os.environ.get("SUPABASE_URL", "")
+key = os.environ.get("SUPABASE_KEY", "")
+supabase: Client = create_client(url, key)
+
+# GMAIL SMTP SETUP
+GMAIL_USER = os.environ.get("GMAIL_SMTP_USER", "")
+GMAIL_APP_PASSWORD = os.environ.get("GMAIL_SMTP_PASSWORD", "")
+
+def send_otp_email(to_email, otp_code, action_text="Verification"):
+    if not GMAIL_USER or not GMAIL_APP_PASSWORD:
+        print("Warning: Gmail credentials not configured in .env. Email skipped.")
+        return
+        
+    try:
+        msg = MIMEMultipart()
+        msg['From'] = f"Wear & Care <{GMAIL_USER}>"
+        msg['To'] = to_email
+        msg['Subject'] = f"{action_text} OTP - Wear & Care"
+        
+        body = f"Hello,\n\nYour 6-digit OTP for {action_text} is: {otp_code}\n\nPlease enter this code on the website to proceed.\n\nBest Regards,\nThe Wear & Care Team"
+        msg.attach(MIMEText(body, 'plain'))
+        
+        server = smtplib.SMTP('smtp.gmail.com', 587)
+        server.starttls()
+        server.login(GMAIL_USER, GMAIL_APP_PASSWORD)
+        server.send_message(msg)
+        server.quit()
+        print(f"OTP email successfully sent to {to_email}")
+    except Exception as e:
+        print(f"Failed to send OTP via Gmail SMTP: {str(e)}")
 
 app = Flask(__name__)
 app.secret_key = "wearcare-dev"
@@ -12,58 +50,67 @@ UPLOAD_FOLDER = "static/uploads"
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 
 
-# DATABASE CONNECTION
-def get_db():
-    return mysql.connector.connect(
-        host="localhost",
-        user="root",
-        password="",
-        database="wearcare"
+# TUPLE HELPERS FOR TEMPLATE COMPATIBILITY
+def dict_to_donation_tuple(d):
+    return (
+        d.get('id'),                # 0
+        d.get('user_name'),         # 1
+        d.get('cloth_type'),        # 2
+        d.get('size'),              # 3
+        d.get('condition_status'),  # 4
+        d.get('address'),           # 5
+        d.get('image'),             # 6
+        d.get('status'),            # 7
+        d.get('user_id'),           # 8
+        d.get('phone'),             # 9
+        1 if d.get('is_free') else 0, # 10
+        d.get('price'),             # 11
+        d.get('created_at'),        # 12
+        d.get('updated_at')         # 13
     )
 
+def dict_to_user_tuple(u):
+    return (u.get('id'), u.get('name'), u.get('email'), u.get('created_at'))
+
+def dict_to_request_tuple(pr):
+    d = pr.get('donations', {})
+    u = pr.get('users', {})
+    return (
+        pr.get('id'), pr.get('status'), pr.get('created_at'),
+        d.get('id'), d.get('cloth_type'), d.get('size'), d.get('condition_status'),
+        u.get('name'), u.get('email')
+    )
 
 # LOGIN REQUIRED
 def login_required(view_func):
     @wraps(view_func)
     def wrapper(*args, **kwargs):
-
         if not session.get("user_id"):
             return redirect("/login")
-
         return view_func(*args, **kwargs)
-
     return wrapper
-
 
 # ADMIN REQUIRED
 def admin_required(view_func):
     @wraps(view_func)
     def wrapper(*args, **kwargs):
-
         if not session.get("is_admin"):
             return redirect("/admin-login")
-
         return view_func(*args, **kwargs)
-
     return wrapper
-
 
 def normalize_email(email):
     return (email or "").strip().lower()
-
 
 # HOME
 @app.route('/')
 def home():
     return render_template("index.html", active_page="home", user_id=session.get("user_id"))
 
-
 # REGISTER
 @app.route('/register', methods=['GET', 'POST'])
 def register():
-
     if request.method == 'POST':
-
         name = request.form.get('name')
         email = normalize_email(request.form.get('email'))
         password = request.form.get('password')
@@ -71,92 +118,153 @@ def register():
         if not name or not email or not password:
             return render_template("register.html", error="Please fill all fields")
 
-        db = get_db()
-        cursor = db.cursor()
+        # Check if email is already registered in the database to prevent duplicate signups
+        try:
+            existing_user = supabase.table('users').select('id').eq('email', email).execute()
+            if existing_user.data:
+                return render_template("register.html", error="An account with this email already exists. Please log in.")
+        except Exception:
+            pass # ignore errors if the db check temporarily fails
 
-        cursor.execute("SELECT id FROM users WHERE email=%s", (email,))
-        user = cursor.fetchone()
-
-        if user:
-            return render_template("register.html", error="Email already exists")
-
-        hashed = generate_password_hash(password)
-
-        cursor.execute(
-            "INSERT INTO users(name,email,password) VALUES(%s,%s,%s)",
-            (name, email, hashed)
-        )
-
-        db.commit()
-        cursor.close()
-        db.close()
-
-        return redirect("/login")
+        # Generate Custom 6-Digit OTP
+        otp = str(random.randint(100000, 999999))
+        session['signup_otp'] = otp
+        session['signup_email'] = email
+        session['signup_password'] = password
+        session['signup_name'] = name
+        
+        # Send via our completely custom Gmail logic
+        send_otp_email(email, otp, "Account Registration")
+        
+        return redirect(f"/verify-otp?email={email}")
 
     return render_template("register.html")
-
 
 # USER LOGIN
 @app.route('/login', methods=['GET', 'POST'])
 def login():
-
     if request.method == "POST":
-
         email = normalize_email(request.form.get("email"))
-        password = request.form.get("password")
+        password = request.form.get("password") or ""
 
-        db = get_db()
-        cursor = db.cursor()
-
-        cursor.execute(
-            "SELECT id,name,email,password FROM users WHERE email=%s",
-            (email,)
-        )
-
-        user = cursor.fetchone()
-
-        if not user:
-            return render_template("login.html", error="Invalid email or password")
-
-        user_id, name, email, hashed_password = user
-
-        if not check_password_hash(hashed_password, password):
-            return render_template("login.html", error="Invalid email or password")
-
-        session["user_id"] = user_id
-        session["user_name"] = name
-        session["user_email"] = email
-        session["is_admin"] = False
-
-        cursor.close()
-        db.close()
-
-        return redirect("/dashboard")
+        try:
+            res = supabase.auth.sign_in_with_password({
+                "email": email,
+                "password": password
+            })
+            
+            user = res.user
+            if not user:
+                return render_template("login.html", error="Login failed, no user returned.")
+            session["user_id"] = user.id
+            session["user_name"] = user.user_metadata.get("name", "User") if user.user_metadata else "User"
+            session["user_email"] = user.email
+            session["is_admin"] = False
+            
+            # Send the welcome email on their actual first confirmed login if you wish, 
+            # but since they successfully confirmed their OTP, Supabase sends their token natively.
+            
+            return redirect("/dashboard")
+        except Exception as e:
+            msg = str(e)
+            if "Email not confirmed" in msg:
+                return redirect(f"/verify-otp?email={email}")
+            return render_template("login.html", error="Invalid email or password (or unconfirmed account)")
 
     return render_template("login.html")
 
+# VERIFY OTP
+@app.route('/verify-otp', methods=['GET', 'POST'])
+def verify_otp():
+    if request.method == 'POST':
+        email = request.form.get('email') or ""
+        otp = request.form.get('otp')
+        
+        expected_otp = session.get('signup_otp')
+        expected_email = session.get('signup_email')
+        
+        if str(otp) == str(expected_otp) and email == expected_email:
+            try:
+                signup_password = str(session.get('signup_password') or "")
+                signup_name = str(session.get('signup_name') or "")
+                supabase.auth.sign_up({
+                    "email": email,
+                    "password": signup_password,
+                    "options": {"data": {"name": signup_name}}
+                })
+                session.pop('signup_otp', None)
+                flash("Account verified and created successfully! Please log in.", "success")
+                return redirect("/login")
+            except Exception as e:
+                return render_template("verify_otp.html", error=f"Verified OTP but Supabase failed: {str(e)}")
+        else:
+            return render_template("verify_otp.html", error="Invalid 6-digit OTP code.")
+
+    return render_template("verify_otp.html")
+
+# FORGOT PASSWORD
+@app.route('/forgot-password', methods=['GET', 'POST'])
+def forgot_password():
+    if request.method == "POST":
+        email = normalize_email(request.form.get("email"))
+        
+        # Generate custom OTP in Flask
+        otp = str(random.randint(100000, 999999))
+        session['reset_otp'] = otp
+        session['reset_email'] = email
+        
+        # Send strictly 6 digit OTP via custom Gmail
+        send_otp_email(email, otp, "Password Reset")
+        
+        return redirect(f"/reset-password?email={email}")
+
+    return render_template("forgot_password.html")
+
+# RESET PASSWORD
+@app.route('/reset-password', methods=['GET', 'POST'])
+def reset_password():
+    if request.method == "POST":
+        email = normalize_email(request.form.get("email"))
+        otp = request.form.get("otp")
+        new_password = request.form.get("password")
+        
+        expected_otp = session.get("reset_otp")
+        expected_email = session.get("reset_email")
+        
+        if str(otp) == str(expected_otp) and email == expected_email:
+            try:
+                # Use custom RPC command to update password directly
+                supabase.rpc("reset_password", {"target_email": email, "new_password": new_password}).execute()
+                
+                # Clear reset session
+                session.pop('reset_otp', None)
+                session.pop('reset_email', None)
+                
+                flash("Password updated successfully! Please log in.", "success")
+                return redirect("/login")
+            except Exception as e:
+                print(f"Password update failed: {e}")
+                return render_template("reset_password.html", error="Failed to update password correctly.")
+        else:
+            return render_template("reset_password.html", error="Invalid OTP code matched.")
+
+    return render_template("reset_password.html")
 
 # ADMIN LOGIN
 @app.route('/admin-login', methods=['GET','POST'])
 def admin_login():
-
     if request.method == "POST":
-
         email = request.form.get("email")
         password = request.form.get("password")
 
         if email == "admin@rushi.com" and password == "admin123":
-
             session["user_id"] = "admin"
             session["user_name"] = "Admin"
             session["is_admin"] = True
-
             return redirect("/admin")
-
+        
         return render_template("admin_login.html", error="Invalid admin credentials")
-
     return render_template("admin_login.html")
-
 
 # LOGOUT
 @app.route("/logout")
@@ -164,164 +272,140 @@ def logout():
     session.clear()
     return redirect("/")
 
-
 # DONATE
 @app.route('/donate', methods=['GET', 'POST'])
 @login_required
 def donate():
-
     if request.method == "POST":
-
         form_name = request.form.get("name") or ""
         user_name = form_name.strip() or session.get("user_name")
         cloth = request.form.get("cloth")
-        size = request.form.get("size")
+        
+        size_select = request.form.get("size_select")
+        size_custom = request.form.get("size_custom")
+        size = size_custom.strip() if size_select == "Other" and size_custom else size_select
+        
         condition = request.form.get("condition")
         address = request.form.get("address")
         phone = (request.form.get("phone") or "").strip()
+
+        if not size:
+            return render_template("donate.html", error="Please specify a valid size.")
 
         if not phone:
             return render_template("donate.html", error="Please enter your phone number")
 
         donation_type = (request.form.get("donation_type") or "free").strip().lower()
-        is_free = 1 if donation_type != "paid" else 0
+        is_free = True if donation_type != "paid" else False
         price_raw = (request.form.get("price") or "").strip()
         price = None
-        if is_free == 0:
+        if not is_free:
             try:
                 price_val = float(price_raw)
                 if price_val <= 0:
                     raise ValueError("Price must be positive")
-                price = round(price_val, 2)
+                price = round(price_val, 2)  # type: ignore
             except Exception:
                 return render_template("donate.html", error="Please enter a valid price for Paid listings")
 
-        image = request.files.get("image")
-        image_name = ""
+        images = request.files.getlist("image")
+        image_list = []
 
-        if image and image.filename != "":
-            filename = secure_filename(image.filename)
-            image_name = filename
-            os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
-            image.save(os.path.join(app.config['UPLOAD_FOLDER'], filename))
+        for img in images[:3]: # Limit to 3 max
+            if img and img.filename:
+                # Prepend timestamp to avoid overrides of identical filenames
+                filename = img.filename
+                safe_name = f"{int(time.time())}_{secure_filename(filename)}"
+                os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
+                img.save(os.path.join(app.config['UPLOAD_FOLDER'], safe_name))
+                image_list.append(safe_name)
 
-        db = get_db()
-        cursor = db.cursor()
+        if len(image_list) == 0:
+            return render_template("donate.html", error="Please upload at least 1 clear photo of the item.")
+            
+        image_name = ",".join(image_list)
+
+        data = {
+            "user_id": session.get("user_id"),
+            "user_name": user_name,
+            "cloth_type": cloth,
+            "size": size,
+            "condition_status": condition,
+            "address": address,
+            "image": image_name,
+            "status": "Pending",
+            "is_free": is_free,
+            "price": price,
+            "phone": phone
+        }
 
         try:
-            cursor.execute(
-                """INSERT INTO donations
-                (user_id,user_name,cloth_type,size,condition_status,address,image,status,is_free,price,phone)
-                VALUES(%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)""",
-                (session.get("user_id"), user_name, cloth, size, condition, address, image_name, "Pending", is_free, price, phone)
-            )
-        except mysql.connector.Error:
-            cursor.execute(
-                """INSERT INTO donations
-                (user_name,cloth_type,size,condition_status,address,image,status)
-                VALUES(%s,%s,%s,%s,%s,%s,%s)""",
-                (user_name, cloth, size, condition, address, image_name, "Pending")
-            )
-
-        db.commit()
-        cursor.close()
-        db.close()
-
-        return render_template("donate.html", success="Donation submitted successfully")
+            supabase.table("donations").insert(data).execute()
+            return render_template("donate.html", success="Donation submitted successfully")
+        except Exception as e:
+            return render_template("donate.html", error=f"Database error: {str(e)}")
 
     return render_template("donate.html")
-
 
 # DASHBOARD
 @app.route('/dashboard')
 @login_required
 def dashboard():
+    user_id = session.get("user_id")
+    
+    # Donations
+    d_res = supabase.table("donations").select("*").eq("user_id", user_id).order('id', desc=True).execute()
+    data = [dict_to_donation_tuple(d) for d in d_res.data]
 
-    db = get_db()
-    cursor = db.cursor()
-
-    try:
-        cursor.execute(
-            "SELECT * FROM donations WHERE user_id=%s ORDER BY id DESC",
-            (session.get("user_id"),)
-        )
-        data = cursor.fetchall()
-    except mysql.connector.Error:
-        cursor.execute(
-            "SELECT * FROM donations WHERE user_name=%s ORDER BY id DESC",
-            (session.get("user_name"),)
-        )
-        data = cursor.fetchall()
-
+    # Notifications
     notifications = []
     popup_notification = None
     try:
-        # Backward compatible: if read_at doesn't exist, this still works via fallback below.
-        try:
-            cursor.execute(
-                "SELECT id, message, created_at, read_at FROM notifications WHERE user_id=%s ORDER BY id DESC LIMIT 10",
-                (session.get("user_id"),)
-            )
-            notifications = cursor.fetchall()
+        n_res = supabase.table("notifications").select("id, message, created_at, read_at").eq("user_id", user_id).order('id', desc=True).limit(10).execute()
+        
+        unread_res = supabase.table("notifications").select("id, message, created_at").eq("user_id", user_id).is_("read_at", "null").order('id', desc=True).limit(1).execute()
+        unread = unread_res.data[0] if unread_res.data else None
+        
+        if unread:
+            popup_notification = {"id": unread['id'], "message": unread['message'], "created_at": unread['created_at']}
+            supabase.table("notifications").update({"read_at": "now()"}).eq("id", unread['id']).execute()
 
-            cursor.execute(
-                "SELECT id, message, created_at FROM notifications WHERE user_id=%s AND read_at IS NULL ORDER BY id DESC LIMIT 1",
-                (session.get("user_id"),)
-            )
-            unread = cursor.fetchone()
-            if unread:
-                popup_notification = {"id": unread[0], "message": unread[1], "created_at": unread[2]}
-                cursor.execute("UPDATE notifications SET read_at=NOW() WHERE id=%s", (unread[0],))
-                db.commit()
-        except mysql.connector.Error:
-            cursor.execute(
-                "SELECT id, message, created_at FROM notifications WHERE user_id=%s ORDER BY id DESC LIMIT 10",
-                (session.get("user_id"),)
-            )
-            notifications = cursor.fetchall()
-    except mysql.connector.Error:
-        notifications = []
+        for n in n_res.data:
+            notifications.append((n.get('id'), n.get('message'), n.get('created_at'), n.get('read_at')))
+    except Exception:
+        pass
 
+    # Incoming Requests
     incoming_requests = []
     try:
-        cursor.execute(
-            """
-            SELECT pr.id, pr.status, pr.created_at,
-                   d.id, d.cloth_type, d.size, d.condition_status,
-                   u.name, u.email
-            FROM purchase_requests pr
-            JOIN donations d ON d.id = pr.donation_id
-            JOIN users u ON u.id = pr.buyer_user_id
-            WHERE d.user_id = %s
-            ORDER BY pr.id DESC
-            """,
-            (session.get("user_id"),)
-        )
-        incoming_requests = cursor.fetchall()
-    except mysql.connector.Error:
-        incoming_requests = []
+        pr_res = supabase.table('purchase_requests').select(
+            'id, status, created_at, '
+            'donations!inner(id, cloth_type, size, condition_status, user_id), '
+            'users!buyer_user_id(name, email)'
+        ).eq('donations.user_id', user_id).order('id', desc=True).execute()
+        
+        incoming_requests = [dict_to_request_tuple(pr) for pr in pr_res.data]
+    except Exception:
+        pass
 
+    # My Requests
     my_requests = []
     try:
-        cursor.execute(
-            """
-            SELECT pr.id, pr.status, pr.created_at,
-                   d.id, d.cloth_type, d.size, d.condition_status,
-                   du.name, du.email
-            FROM purchase_requests pr
-            JOIN donations d ON d.id = pr.donation_id
-            JOIN users du ON du.id = d.user_id
-            WHERE pr.buyer_user_id = %s
-            ORDER BY pr.id DESC
-            """,
-            (session.get("user_id"),)
-        )
-        my_requests = cursor.fetchall()
-    except mysql.connector.Error:
-        my_requests = []
-
-    cursor.close()
-    db.close()
+        mr_res = supabase.table('purchase_requests').select(
+            'id, status, created_at, '
+            'donations!inner(id, cloth_type, size, condition_status, user_id, users!user_id(name, email))'
+        ).eq('buyer_user_id', user_id).order('id', desc=True).execute()
+        
+        for mr in mr_res.data:
+            d = mr.get('donations', {})
+            donor_u = d.get('users', {})
+            my_requests.append((
+                mr.get('id'), mr.get('status'), mr.get('created_at'),
+                d.get('id'), d.get('cloth_type'), d.get('size'), d.get('condition_status'),
+                donor_u.get('name'), donor_u.get('email')
+            ))
+    except Exception:
+        pass
 
     return render_template(
         "dashboard.html",
@@ -332,177 +416,92 @@ def dashboard():
         popup_notification=popup_notification
     )
 
-
 # ADMIN PANEL
 @app.route('/admin')
 @admin_required
 def admin():
-
-    db = get_db()
-    cursor = db.cursor()
-
-    cursor.execute("SELECT * FROM donations")
-    data = cursor.fetchall()
-
-    cursor.close()
-    db.close()
-
+    res = supabase.table("donations").select("*").order('id', desc=True).execute()
+    data = [dict_to_donation_tuple(d) for d in res.data]
     return render_template("admin.html", donations=data)
-
 
 @app.route('/listings')
 def listings():
-
-    db = get_db()
-    cursor = db.cursor()
-
-    # Show only donations from OTHER users (not your own)
     user_id = session.get("user_id")
     if user_id and not session.get("is_admin"):
-        cursor.execute("SELECT * FROM donations WHERE user_id != %s OR user_id IS NULL ORDER BY id DESC", (user_id,))
+        res = supabase.table("donations").select("*").neq("user_id", user_id).order('id', desc=True).execute()
     else:
-        cursor.execute("SELECT * FROM donations ORDER BY id DESC")
-    data = cursor.fetchall()
-
-    cursor.close()
-    db.close()
-
+        res = supabase.table("donations").select("*").order('id', desc=True).execute()
+        
+    data = [dict_to_donation_tuple(d) for d in res.data]
     return render_template("listings.html", donations=data, active_page="listings")
-
 
 @app.route('/requests')
 @login_required
 def requests_page():
-    db = get_db()
-    cursor = db.cursor()
-
+    user_id = session.get("user_id")
     incoming_requests = []
     try:
-        cursor.execute(
-            """
-            SELECT pr.id, pr.status, pr.created_at,
-                   d.id, d.cloth_type, d.size, d.condition_status,
-                   u.name, u.email
-            FROM purchase_requests pr
-            JOIN donations d ON d.id = pr.donation_id
-            JOIN users u ON u.id = pr.buyer_user_id
-            WHERE d.user_id = %s
-            ORDER BY pr.id DESC
-            """,
-            (session.get("user_id"),)
-        )
-        incoming_requests = cursor.fetchall()
-    except mysql.connector.Error:
-        incoming_requests = []
-
-    cursor.close()
-    db.close()
-
+        pr_res = supabase.table('purchase_requests').select(
+            'id, status, created_at, '
+            'donations!inner(id, cloth_type, size, condition_status, user_id), '
+            'users!buyer_user_id(name, email)'
+        ).eq('donations.user_id', user_id).order('id', desc=True).execute()
+        
+        incoming_requests = [dict_to_request_tuple(pr) for pr in pr_res.data]
+    except Exception:
+        pass
+    
     return render_template("requests.html", incoming_requests=incoming_requests, active_page="requests")
-
 
 # ADMIN: USERS LIST
 @app.route('/admin/users')
 @admin_required
 def admin_users():
-    db = get_db()
-    cursor = db.cursor()
-
-    try:
-        cursor.execute("SELECT id,name,email,created_at FROM users ORDER BY id DESC")
-        users = cursor.fetchall()
-    except mysql.connector.Error:
-        cursor.execute("SELECT id,name,email FROM users ORDER BY id DESC")
-        rows = cursor.fetchall()
-        users = [(r[0], r[1], r[2], None) for r in rows]
-
-    cursor.close()
-    db.close()
-
+    res = supabase.table("users").select("*").order('created_at', desc=True).execute()
+    users = [dict_to_user_tuple(u) for u in res.data]
     return render_template("admin_users.html", users=users, active_page="admin")
 
-
 # ADMIN: EDIT USER
-@app.route('/admin/users/<int:user_id>/edit', methods=['GET', 'POST'])
+@app.route('/admin/users/<user_id>/edit', methods=['GET', 'POST'])
 @admin_required
 def admin_edit_user(user_id):
-    db = get_db()
-    cursor = db.cursor()
-
     if request.method == "POST":
         name = (request.form.get("name") or "").strip()
         email = normalize_email(request.form.get("email"))
-        new_password = request.form.get("password") or ""
-
+        # Password editing omitted for Supabase admin endpoint restrictions
+        # (Could use auth admin API but simpler to just edit public profile)
+        
         if not name or not email:
             flash("Name and email are required.", "warning")
             return redirect(f"/admin/users/{user_id}/edit")
 
-        cursor.execute("SELECT id FROM users WHERE email=%s AND id<>%s", (email, user_id))
-        if cursor.fetchone():
-            flash("Email already exists for another user.", "warning")
-            return redirect(f"/admin/users/{user_id}/edit")
-
-        if new_password.strip() != "":
-            hashed = generate_password_hash(new_password)
-            cursor.execute(
-                "UPDATE users SET name=%s,email=%s,password=%s WHERE id=%s",
-                (name, email, hashed, user_id)
-            )
-        else:
-            cursor.execute(
-                "UPDATE users SET name=%s,email=%s WHERE id=%s",
-                (name, email, user_id)
-            )
-
-        db.commit()
+        supabase.table("users").update({"name": name, "email": email}).eq("id", user_id).execute()
         flash("User updated successfully.", "success")
-        cursor.close()
-        db.close()
         return redirect("/admin/users")
 
-    try:
-        cursor.execute("SELECT id,name,email,created_at FROM users WHERE id=%s", (user_id,))
-        user = cursor.fetchone()
-    except mysql.connector.Error:
-        cursor.execute("SELECT id,name,email FROM users WHERE id=%s", (user_id,))
-        row = cursor.fetchone()
-        user = (row[0], row[1], row[2], None) if row else None
-
-    cursor.close()
-    db.close()
-
-    if not user:
+    res = supabase.table("users").select("*").eq("id", user_id).execute()
+    if not res.data:
         flash("User not found.", "warning")
         return redirect("/admin/users")
-
+        
+    user = dict_to_user_tuple(res.data[0])
     return render_template("admin_user_edit.html", user=user, active_page="admin")
 
-
 # ADMIN: DELETE USER
-@app.route('/admin/users/<int:user_id>/delete', methods=['POST'])
+@app.route('/admin/users/<user_id>/delete', methods=['POST'])
 @admin_required
 def admin_delete_user(user_id):
-    db = get_db()
-    cursor = db.cursor()
-
-    cursor.execute("DELETE FROM users WHERE id=%s", (user_id,))
-    db.commit()
-
-    cursor.close()
-    db.close()
-
+    # Deleting from public.users will cascade or might need auth admin API
+    # Assuming public.users ON DELETE CASCADE is NOT on auth.users backwards.
+    # To truly delete a user, we should delete via auth endpoints or let public.user be deleted.
+    supabase.table("users").delete().eq("id", user_id).execute()
     flash("User deleted.", "success")
     return redirect("/admin/users")
-
 
 # ADMIN: EDIT DONATION/LISTING
 @app.route('/admin/donations/<int:donation_id>/edit', methods=['GET', 'POST'])
 @admin_required
 def admin_edit_donation(donation_id):
-    db = get_db()
-    cursor = db.cursor()
-
     if request.method == "POST":
         user_name = (request.form.get("user_name") or "").strip()
         cloth = (request.form.get("cloth") or "").strip()
@@ -512,15 +511,15 @@ def admin_edit_donation(donation_id):
         status = (request.form.get("status") or "Pending").strip()
 
         listing_type = (request.form.get("donation_type") or "free").strip().lower()
-        is_free = 1 if listing_type != "paid" else 0
+        is_free = True if listing_type != "paid" else False
         price_raw = (request.form.get("price") or "").strip()
         price = None
-        if is_free == 0:
+        if not is_free:
             try:
                 price_val = float(price_raw)
                 if price_val <= 0:
                     raise ValueError("Price must be positive")
-                price = round(price_val, 2)
+                price = round(price_val, 2)  # type: ignore
             except Exception:
                 flash("Please enter a valid price for Paid listings.", "warning")
                 return redirect(f"/admin/donations/{donation_id}/edit")
@@ -529,130 +528,79 @@ def admin_edit_donation(donation_id):
             flash("All fields are required.", "warning")
             return redirect(f"/admin/donations/{donation_id}/edit")
 
-        try:
-            cursor.execute(
-                """UPDATE donations
-                   SET user_name=%s, cloth_type=%s, size=%s, condition_status=%s, address=%s,
-                       status=%s, is_free=%s, price=%s
-                   WHERE id=%s""",
-                (user_name, cloth, size, condition, address, status, is_free, price, donation_id)
-            )
-        except mysql.connector.Error:
-            cursor.execute(
-                """UPDATE donations
-                   SET user_name=%s, cloth_type=%s, size=%s, condition_status=%s, address=%s,
-                       status=%s
-                   WHERE id=%s""",
-                (user_name, cloth, size, condition, address, status, donation_id)
-            )
-
-        db.commit()
+        update_data = {
+            "user_name": user_name, "cloth_type": cloth, "size": size,
+            "condition_status": condition, "address": address, "status": status,
+            "is_free": is_free, "price": price
+        }
+        supabase.table("donations").update(update_data).eq("id", donation_id).execute()
         flash("Listing updated successfully.", "success")
-        cursor.close()
-        db.close()
         return redirect("/admin")
 
-    cursor.execute("SELECT * FROM donations WHERE id=%s", (donation_id,))
-    donation = cursor.fetchone()
-
-    cursor.close()
-    db.close()
-
-    if not donation:
+    res = supabase.table("donations").select("*").eq("id", donation_id).execute()
+    if not res.data:
         flash("Listing not found.", "warning")
         return redirect("/admin")
-
+        
+    donation = dict_to_donation_tuple(res.data[0])
     return render_template("admin_donation_edit.html", donation=donation, active_page="admin")
-
 
 # ADMIN: DELETE DONATION/LISTING
 @app.route('/admin/donations/<int:donation_id>/delete', methods=['POST'])
 @admin_required
 def admin_delete_donation(donation_id):
-    db = get_db()
-    cursor = db.cursor()
-
-    cursor.execute("DELETE FROM donations WHERE id=%s", (donation_id,))
-    db.commit()
-
-    cursor.close()
-    db.close()
-
+    supabase.table("donations").delete().eq("id", donation_id).execute()
     flash("Listing deleted.", "success")
     return redirect("/admin")
 
-
-# BUY/REQUEST (only logged-in users, not admin)
+# BUY/REQUEST
 @app.route('/request/<int:donation_id>')
 @login_required
 def request_listing(donation_id):
     if session.get("is_admin"):
         return redirect("/admin")
 
-    db = get_db()
-    cursor = db.cursor()
-
-    cursor.execute("SELECT * FROM donations WHERE id=%s", (donation_id,))
-    d = cursor.fetchone()
-
-    if not d:
-        cursor.close()
-        db.close()
+    res = supabase.table("donations").select("*").eq("id", donation_id).execute()
+    if not res.data:
         flash("Listing not found.", "warning")
         return redirect("/listings")
-
-    status = d[7] if len(d) > 7 else "Pending"
-    image = d[6] if len(d) > 6 else ""
+        
+    d = dict_to_donation_tuple(res.data[0])
+    
+    status = d[7]
+    image_str = d[6] or ""
+    
     if status == "Rejected":
-        cursor.close()
-        db.close()
         flash("This listing is rejected and not available.", "warning")
         return redirect("/listings")
 
-    is_free = True
-    price = None
-    phone = None
-    try:
-        is_free = True if (len(d) > 10 and (d[10] == 1 or d[10] is True)) else False
-        price = d[11] if len(d) > 11 else None
-        phone = d[12] if len(d) > 12 else None
-    except Exception:
-        is_free = True
-
-    # Check if request already exists
+    is_free = True if d[10] == 1 else False
+    price = d[11]
+    
     request_status = None
     request_sent = False
-    try:
-        cursor.execute(
-            "SELECT status FROM purchase_requests WHERE donation_id=%s AND buyer_user_id=%s ORDER BY id DESC LIMIT 1",
-            (donation_id, session.get("user_id"))
-        )
-        existing = cursor.fetchone()
-        if existing:
-            request_sent = True
-            request_status = existing[0]
-    except mysql.connector.Error:
-        pass
+    req_res = supabase.table("purchase_requests").select("status").eq("donation_id", donation_id).eq("buyer_user_id", session.get("user_id")).order('id', desc=True).limit(1).execute()
+    if req_res.data:
+        request_sent = True
+        request_status = req_res.data[0]['status']
 
-    cursor.close()
-    db.close()
+    phone = d[11] if request_status == "Approved" else None
 
     return render_template(
         "request.html",
         donation_id=donation_id,
-        donor_name=d[1] if len(d) > 1 else "",
-        cloth=d[2] if len(d) > 2 else "",
-        size=d[3] if len(d) > 3 else "",
-        condition=d[4] if len(d) > 4 else "",
+        donor_name=d[2],
+        cloth=d[3],
+        size=d[4],
+        condition=d[5],
         status=status,
-        image=image,
+        image_str=image_str,
         is_free=is_free,
         price=price,
         request_sent=request_sent,
         request_status=request_status,
-        phone=phone if request_status == "Approved" else None
+        phone=phone
     )
-
 
 @app.route('/send-request/<int:donation_id>', methods=['POST'])
 @login_required
@@ -660,64 +608,33 @@ def send_request(donation_id):
     if session.get("is_admin"):
         return redirect("/admin")
 
-    db = get_db()
-    cursor = db.cursor()
-
-    cursor.execute("SELECT * FROM donations WHERE id=%s", (donation_id,))
-    d = cursor.fetchone()
-
-    if not d:
-        cursor.close()
-        db.close()
+    res = supabase.table("donations").select("*").eq("id", donation_id).execute()
+    if not res.data:
         flash("Listing not found.", "warning")
         return redirect("/listings")
+        
+    donor_user_id = res.data[0].get('user_id')
 
-    # Check if request already exists
-    cursor.execute(
-        "SELECT id FROM purchase_requests WHERE donation_id=%s AND buyer_user_id=%s",
-        (donation_id, session.get("user_id"))
-    )
-    if cursor.fetchone():
-        cursor.close()
-        db.close()
+    req_res = supabase.table("purchase_requests").select("id").eq("donation_id", donation_id).eq("buyer_user_id", session.get("user_id")).execute()
+    if req_res.data:
         flash("You have already requested this item.", "info")
         return redirect(f"/request/{donation_id}")
 
-    # Create the request
-    cursor.execute(
-        "INSERT INTO purchase_requests(donation_id,buyer_user_id,status) VALUES(%s,%s,%s)",
-        (donation_id, session.get("user_id"), "Pending")
-    )
+    supabase.table("purchase_requests").insert({
+        "donation_id": donation_id,
+        "buyer_user_id": session.get("user_id"),
+        "status": "Pending"
+    }).execute()
 
-    # Notify buyer
     try:
-        cursor.execute(
-            "INSERT INTO notifications(user_id, message) VALUES(%s,%s)",
-            (session.get("user_id"), f"Your request for listing #{donation_id} has been sent to the donor for approval.")
-        )
-    except mysql.connector.Error:
-        pass
-
-    # Notify donor
-    try:
-        cursor.execute("SELECT user_id FROM donations WHERE id=%s", (donation_id,))
-        donor_row = cursor.fetchone()
-        donor_user_id = donor_row[0] if donor_row else None
+        supabase.table("notifications").insert({"user_id": session.get("user_id"), "message": f"Your request for listing #{donation_id} has been sent to the donor for approval."}).execute()
         if donor_user_id:
-            cursor.execute(
-                "INSERT INTO notifications(user_id, message) VALUES(%s,%s)",
-                (donor_user_id, f"You received a new request for listing #{donation_id}. Approve or Reject from your Requests page.")
-            )
-    except mysql.connector.Error:
+            supabase.table("notifications").insert({"user_id": donor_user_id, "message": f"You received a new request for listing #{donation_id}. Approve or Reject from your Requests page."}).execute()
+    except Exception:
         pass
-
-    db.commit()
-    cursor.close()
-    db.close()
 
     flash("Request sent successfully!", "success")
     return redirect(f"/request/{donation_id}")
-
 
 @app.route('/donor/requests/<int:request_id>/approve', methods=['POST'])
 @login_required
@@ -725,41 +642,23 @@ def donor_approve_request(request_id):
     if session.get("is_admin"):
         return redirect("/admin")
 
-    db = get_db()
-    cursor = db.cursor()
     try:
-        cursor.execute(
-            """
-            SELECT pr.donation_id, pr.buyer_user_id, d.user_id
-            FROM purchase_requests pr
-            JOIN donations d ON d.id = pr.donation_id
-            WHERE pr.id=%s
-            """,
-            (request_id,)
-        )
-        row = cursor.fetchone()
-        if not row or row[2] != session.get("user_id"):
+        pr_res = supabase.table("purchase_requests").select("donation_id, buyer_user_id, donations!inner(user_id)").eq("id", request_id).execute()
+        if not pr_res.data or pr_res.data[0]['donations']['user_id'] != session.get("user_id"):
             flash("Not authorized.", "warning")
-            cursor.close()
-            db.close()
             return redirect("/dashboard")
 
-        donation_id, buyer_user_id, _ = row
-        cursor.execute("UPDATE purchase_requests SET status='Approved' WHERE id=%s", (request_id,))
-        cursor.execute(
-            "INSERT INTO notifications(user_id, message) VALUES(%s,%s)",
-            (buyer_user_id, f"Your request for listing #{donation_id} has been Approved by the donor.")
-        )
-        db.commit()
+        row = pr_res.data[0]
+        donation_id = row['donation_id']
+        buyer_user_id = row['buyer_user_id']
+        
+        supabase.table("purchase_requests").update({"status": "Approved"}).eq("id", request_id).execute()
+        supabase.table("notifications").insert({"user_id": buyer_user_id, "message": f"Your request for listing #{donation_id} has been Approved by the donor."}).execute()
         flash("Request approved.", "success")
-    except mysql.connector.Error:
-        flash("Request system is not available (DB not updated).", "warning")
-    finally:
-        cursor.close()
-        db.close()
+    except Exception:
+        flash("Error processing request.", "warning")
 
     return redirect("/dashboard")
-
 
 @app.route('/donor/requests/<int:request_id>/reject', methods=['POST'])
 @login_required
@@ -767,103 +666,57 @@ def donor_reject_request(request_id):
     if session.get("is_admin"):
         return redirect("/admin")
 
-    db = get_db()
-    cursor = db.cursor()
     try:
-        cursor.execute(
-            """
-            SELECT pr.donation_id, pr.buyer_user_id, d.user_id
-            FROM purchase_requests pr
-            JOIN donations d ON d.id = pr.donation_id
-            WHERE pr.id=%s
-            """,
-            (request_id,)
-        )
-        row = cursor.fetchone()
-        if not row or row[2] != session.get("user_id"):
+        pr_res = supabase.table("purchase_requests").select("donation_id, buyer_user_id, donations!inner(user_id)").eq("id", request_id).execute()
+        if not pr_res.data or pr_res.data[0]['donations']['user_id'] != session.get("user_id"):
             flash("Not authorized.", "warning")
-            cursor.close()
-            db.close()
             return redirect("/dashboard")
 
-        donation_id, buyer_user_id, _ = row
-        cursor.execute("UPDATE purchase_requests SET status='Rejected' WHERE id=%s", (request_id,))
-        cursor.execute(
-            "INSERT INTO notifications(user_id, message) VALUES(%s,%s)",
-            (buyer_user_id, f"Your request for listing #{donation_id} has been Rejected by the donor.")
-        )
-        db.commit()
+        row = pr_res.data[0]
+        donation_id = row['donation_id']
+        buyer_user_id = row['buyer_user_id']
+        
+        supabase.table("purchase_requests").update({"status": "Rejected"}).eq("id", request_id).execute()
+        supabase.table("notifications").insert({"user_id": buyer_user_id, "message": f"Your request for listing #{donation_id} has been Rejected by the donor."}).execute()
         flash("Request rejected.", "success")
-    except mysql.connector.Error:
-        flash("Request system is not available (DB not updated).", "warning")
-    finally:
-        cursor.close()
-        db.close()
+    except Exception:
+        flash("Error processing request.", "warning")
 
     return redirect("/dashboard")
 
-
 # APPROVE DONATION
-@app.route('/approve/<id>')
+@app.route('/approve/<int:donation_id>')
 @admin_required
-def approve(id):
-
-    db = get_db()
-    cursor = db.cursor()
-
-    cursor.execute("SELECT user_id FROM donations WHERE id=%s", (id,))
-    row = cursor.fetchone()
-    user_id = row[0] if row else None
-
-    cursor.execute("UPDATE donations SET status='Approved' WHERE id=%s", (id,))
-
-    try:
-        if user_id:
-            cursor.execute(
-                "INSERT INTO notifications(user_id, message) VALUES(%s,%s)",
-                (user_id, "Your donation/listing has been Approved.")
-            )
-    except mysql.connector.Error:
-        pass
-
-    db.commit()
-
-    cursor.close()
-    db.close()
+def approve(donation_id):
+    res = supabase.table("donations").select("user_id").eq("id", donation_id).execute()
+    user_id = res.data[0]['user_id'] if res.data else None
+    
+    supabase.table("donations").update({"status": "Approved"}).eq("id", donation_id).execute()
+    
+    if user_id:
+        try:
+            supabase.table("notifications").insert({"user_id": user_id, "message": "Your donation/listing has been Approved."}).execute()
+        except:
+            pass
 
     return redirect("/admin")
-
 
 # REJECT DONATION
-@app.route('/reject/<id>')
+@app.route('/reject/<int:donation_id>')
 @admin_required
-def reject(id):
-
-    db = get_db()
-    cursor = db.cursor()
-
-    cursor.execute("SELECT user_id FROM donations WHERE id=%s", (id,))
-    row = cursor.fetchone()
-    user_id = row[0] if row else None
-
-    cursor.execute("UPDATE donations SET status='Rejected' WHERE id=%s", (id,))
-
-    try:
-        if user_id:
-            cursor.execute(
-                "INSERT INTO notifications(user_id, message) VALUES(%s,%s)",
-                (user_id, "Your donation/listing has been Rejected.")
-            )
-    except mysql.connector.Error:
-        pass
-
-    db.commit()
-
-    cursor.close()
-    db.close()
+def reject(donation_id):
+    res = supabase.table("donations").select("user_id").eq("id", donation_id).execute()
+    user_id = res.data[0]['user_id'] if res.data else None
+    
+    supabase.table("donations").update({"status": "Rejected"}).eq("id", donation_id).execute()
+    
+    if user_id:
+        try:
+            supabase.table("notifications").insert({"user_id": user_id, "message": "Your donation/listing has been Rejected."}).execute()
+        except:
+            pass
 
     return redirect("/admin")
-
 
 if __name__ == "__main__":
     app.run(debug=True)

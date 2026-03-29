@@ -178,64 +178,77 @@
     </div>
   </div>
 
-  <div class="wc-card">
-    <div class="wc-card-body">
-      <div class="table-responsive">
-        <table class="table table-dark table-striped align-middle mb-0">
-          <thead>
-            <tr>
-              <th>Name</th>
-              <th>Cloth</th>
-              <th>Size</th>
-              <th>Type</th>
-              <th>Condition</th>
-              <th>Address</th>
-              <th>Image</th>
-              <th>Status</th>
-            </tr>
-          </thead>
-          <tbody>
-          {% for d in donations %}
-            <tr>
-              <td class="fw-semibold">{{ d[1] if d|length > 1 else '' }}</td>
-              <td>{{ d[2] if d|length > 2 else '' }}</td>
-              <td>{{ d[3] if d|length > 3 else '' }}</td>
-              <td>
-                {% set is_free = (d[10] if d|length > 10 else 1) %}
-                {% set price = (d[11] if d|length > 11 else None) %}
-                {% if is_free == 1 or is_free == True %}
-                  <span class="badge wc-badge text-bg-success">Free</span>
-                {% else %}
-                  <span class="badge wc-badge text-bg-warning">Paid{% if price %} • ₹{{ price }}{% endif %}</span>
-                {% endif %}
-              </td>
-              <td>{{ d[4] if d|length > 4 else '' }}</td>
-              <td>{{ d[5] if d|length > 5 else '' }}</td>
-              <td>
-                {% if d|length > 6 and d[6] %}
-                  <a class="link-light" href="{{ url_for('static', filename='uploads/' + d[6]) }}" target="_blank" rel="noopener">View</a>
-                {% else %}
-                  <span class="wc-muted">—</span>
-                {% endif %}
-              </td>
-              <td>
-                {% set status = (d[7] if d|length > 7 else '') %}
-                {% if status == 'Approved' %}
-                  <span class="badge wc-badge text-bg-success">Approved</span>
-                {% elif status == 'Rejected' %}
-                  <span class="badge wc-badge text-bg-danger">Rejected</span>
-                {% elif status == 'Pending' or status == '' or status is none %}
-                  <span class="badge wc-badge text-bg-secondary">Pending</span>
-                {% else %}
-                  <span class="badge wc-badge text-bg-secondary">{{ status }}</span>
-                {% endif %}
-              </td>
-            </tr>
-          {% endfor %}
-          </tbody>
-        </table>
+  <div class="fw-bold h4 mb-3 mt-5">My Donated Items</div>
+  <div class="row g-4 mb-4">
+    {% for d in donations %}
+      {% set is_free = (d[10] if d|length > 10 else 1) %}
+      {% set price = (d[11] if d|length > 11 else None) %}
+      {% set status = (d[7] if d|length > 7 else '') %}
+      <div class="col-12 col-md-6 col-xl-3">
+        <div class="wc-card h-100 d-flex flex-column wc-card-hover" style="overflow: hidden; padding: 0; background: rgba(255,255,255,0.03);">
+          <!-- Large Instagram/Flipkart style image section -->
+          <div style="background-color: rgba(0,0,0,0.4); position: relative; border-bottom: 1px solid rgba(255,255,255,0.05);">
+            {% set images_list = d[6].split(',') if d|length > 6 and d[6] else [] %}
+            {% if images_list|length > 0 %}
+              <img src="{{ url_for('static', filename='uploads/' + images_list[0]) }}" alt="Donated Item" class="w-100" style="aspect-ratio: 1/1; object-fit: contain; padding: 0.5rem; transition: transform 0.4s ease;">
+            {% else %}
+              <div class="d-flex align-items-center justify-content-center w-100" style="aspect-ratio: 1/1;">
+                <span class="wc-muted">No Image Available</span>
+              </div>
+            {% endif %}
+            
+            <!-- Floating Status Badge -->
+            <div style="position: absolute; top: 1rem; right: 1rem; z-index: 2;">
+              {% if status == 'Approved' %}
+                <span class="badge text-bg-success shadow-sm" style="font-size: 0.8rem; padding: 0.4rem 0.7rem; border-radius: 6px;">Approved</span>
+              {% elif status == 'Rejected' %}
+                <span class="badge text-bg-danger shadow-sm" style="font-size: 0.8rem; padding: 0.4rem 0.7rem; border-radius: 6px;">Rejected</span>
+              {% else %}
+                <span class="badge text-bg-secondary shadow-sm" style="font-size: 0.8rem; padding: 0.4rem 0.7rem; border-radius: 6px; box-shadow: 0 4px 10px rgba(0,0,0,0.5);">Pending</span>
+              {% endif %}
+            </div>
+          </div>
+
+          <!-- Product Details Section -->
+          <div class="p-4 d-flex flex-column flex-grow-1">
+            <div class="d-flex justify-content-between align-items-start mb-2">
+              <h5 class="fw-bold mb-0 text-white" style="font-size: 1.15rem;">{{ d[2] if d|length > 2 else 'Item' }}</h5>
+              {% if is_free == 1 or is_free == True %}
+                <span class="badge text-bg-success shadow-sm" style="border-radius: 6px;">Free</span>
+              {% else %}
+                <span class="badge text-bg-warning shadow-sm" style="border-radius: 6px; color: #000;">Paid{% if price %} • ₹{{ price }}{% endif %}</span>
+              {% endif %}
+            </div>
+            
+            <div class="d-flex flex-column gap-2 mt-3 small wc-muted">
+              <div class="d-flex justify-content-between border-bottom pb-2" style="border-color: rgba(255,255,255,0.05) !important;">
+                <span>Size</span>
+                <span class="text-white fw-medium">{{ d[3] if d|length > 3 else '—' }}</span>
+              </div>
+              <div class="d-flex justify-content-between border-bottom pb-2" style="border-color: rgba(255,255,255,0.05) !important;">
+                <span>Condition</span>
+                <span class="text-white fw-medium">{{ d[4] if d|length > 4 else '—' }}</span>
+              </div>
+              <div class="d-flex justify-content-between border-bottom pb-2" style="border-color: rgba(255,255,255,0.05) !important;">
+                <span>Location</span>
+                <span class="text-white fw-medium text-truncate" style="max-width: 120px;" title="{{ d[5] if d|length > 5 else '' }}">{{ d[5] if d|length > 5 else '—' }}</span>
+              </div>
+            </div>
+            
+            <div class="mt-4 mt-auto pt-2">
+              {% set images_list = d[6].split(',') if d|length > 6 and d[6] else [] %}
+              {% if images_list|length > 0 %}
+                <a href="/request/{{ d[0] }}" class="btn btn-wc-ghost w-100" style="border-radius: 8px; font-weight: 500;">
+                  View Photo{% if images_list|length > 1 %}s ({{ images_list|length }}){% endif %} & Details
+                </a>
+              {% else %}
+                <button class="btn btn-wc-ghost w-100 disabled" style="border-radius: 8px; font-weight: 500;">No Photo</button>
+              {% endif %}
+            </div>
+          </div>
+        </div>
       </div>
-    </div>
+    {% endfor %}
   </div>
 
   {% endif %}

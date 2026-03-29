@@ -25,6 +25,7 @@
               <th>Name</th>
               <th>Cloth</th>
               <th>Size</th>
+              <th>Image</th>
               <th>Status</th>
               <th class="text-end">Action</th>
             </tr>
@@ -36,6 +37,16 @@
               <td class="fw-semibold">{{ d[1] }}</td>
               <td>{{ d[2] }}</td>
               <td>{{ d[3] }}</td>
+              <td>
+                {% set images_list = d[6].split(',') if d|length > 6 and d[6] else [] %}
+                {% if images_list|length > 0 %}
+                  <a href="{{ url_for('static', filename='uploads/' + images_list[0]) }}" target="_blank" rel="noopener">
+                    <img src="{{ url_for('static', filename='uploads/' + images_list[0]) }}" style="width: 48px; height: 48px; object-fit: cover; border-radius: 6px; border: 1px solid rgba(255,255,255,0.1);" alt="Item" loading="lazy">
+                  </a>
+                {% else %}
+                  <span class="wc-muted">—</span>
+                {% endif %}
+              </td>
               <td>
                 {% set status = d[7] %}
                 {% if status == 'Approved' %}

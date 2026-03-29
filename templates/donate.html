@@ -66,8 +66,19 @@
               </div>
 
               <div class="col-md-4">
-                <label class="form-label" for="size">Size</label>
-                <input class="form-control" id="size" type="text" name="size" placeholder="S / M / L / XL" required>
+                <label class="form-label" for="size_select">Size</label>
+                <select class="form-select" id="size_select" name="size_select" required>
+                  <option value="" disabled selected>Select an option</option>
+                  <option value="XS">XS (Extra Small)</option>
+                  <option value="S">S (Small)</option>
+                  <option value="M">M (Medium)</option>
+                  <option value="L">L (Large)</option>
+                  <option value="XL">XL (Extra Large)</option>
+                  <option value="XXL">XXL</option>
+                  <option value="Free Size">Free Size / One Size</option>
+                  <option value="Other">Other (Type manually)</option>
+                </select>
+                <input class="form-control mt-2" id="size_custom" type="text" name="size_custom" placeholder="e.g. XXXL, 42, Kids 8Y" style="display:none;">
               </div>
 
               <div class="col-md-4">
@@ -79,9 +90,11 @@
                 </select>
               </div>
 
-              <div class="col-md-4">
-                <label class="form-label" for="image">Photo (optional)</label>
-                <input class="form-control" id="image" type="file" name="image" accept="image/*">
+              <div class="col-12">
+                <label class="form-label" for="image">Photos (Upload 1 to 3 images)</label>
+                <input class="form-control" id="image" type="file" name="image" accept="image/*" multiple required>
+                <!-- Dynamic Image Preview Canvas -->
+                <div id="imagePreviewContainer" class="d-flex flex-wrap gap-3 mt-3"></div>
               </div>
 
               <div class="col-12">
@@ -120,8 +133,146 @@
       if (!isPaid && priceEl) priceEl.value = '';
     }
 
+    const sizeSelect = document.getElementById('size_select');
+    const sizeCustom = document.getElementById('size_custom');
+
+    if (sizeSelect) {
+      sizeSelect.addEventListener('change', function() {
+        if (this.value === 'Other') {
+          sizeCustom.style.display = 'block';
+          sizeCustom.required = true;
+        } else {
+          sizeCustom.style.display = 'none';
+          sizeCustom.required = false;
+          sizeCustom.value = '';
+        }
+      });
+    }
+
     if (typeEl) typeEl.addEventListener('change', sync);
     sync();
+
+    // Multiple Image Preview Logic
+    const fileInput = document.getElementById('image');
+    const previewContainer = document.getElementById('imagePreviewContainer');
+    let selectedFiles = [];
+
+    fileInput.addEventListener('change', function(e) {
+      if (e.target.files.length > 0) {
+        selectedFiles = [...selectedFiles, ...Array.from(e.target.files)].slice(0, 3);
+        updateInput();
+        renderPreviews();
+      }
+    });
+
+    function updateInput() {
+      const dt = new DataTransfer();
+      selectedFiles.forEach(file => dt.items.add(file));
+      fileInput.files = dt.files;
+    }
+
+    function removeFile(index) {
+      selectedFiles.splice(index, 1);
+      updateInput();
+      renderPreviews();
+    }
+
+    function renderPreviews() {
+      previewContainer.innerHTML = '';
+      selectedFiles.forEach((file, index) => {
+        const reader = new FileReader();
+        reader.onload = function(e) {
+          const wrapper = document.createElement('div');
+          wrapper.style.position = 'relative';
+          wrapper.style.width = '85px';
+          wrapper.style.height = '85px';
+          
+          const img = document.createElement('img');
+          img.src = e.target.result;
+          img.style.width = '100%';
+          img.style.height = '100%';
+          img.style.objectFit = 'cover';
+          img.style.borderRadius = '8px';
+          img.style.border = '1px solid rgba(255,255,255,0.1)';
+          
+          const btn = document.createElement('button');
+          btn.innerHTML = '&times;';
+          btn.type = 'button';
+          btn.style.position = 'absolute';
+          btn.style.top = '-6px';
+          btn.style.right = '-6px';
+          btn.style.width = '24px';
+          btn.style.height = '24px';
+          btn.style.borderRadius = '50%';
+          btn.style.background = '#e74c3c';
+          btn.style.color = '#fff';
+          btn.style.border = 'none';
+          btn.style.fontWeight = 'bold';
+          btn.style.display = 'flex';
+          btn.style.alignItems = 'center';
+          btn.style.justifyContent = 'center';
+          btn.style.cursor = 'pointer';
+          btn.onclick = () => removeFile(index);
+          
+          wrapper.appendChild(img);
+          wrapper.appendChild(btn);
+          previewContainer.appendChild(wrapper);
+        };
+        reader.readAsDataURL(file);
+      });
+    }
+
+    // Professional Floating Error Toast
+    function showErrorPopup(msg) {
+      const popup = document.createElement('div');
+      popup.style.position = 'fixed';
+      popup.style.top = '20px';
+      popup.style.right = '20px';
+      popup.style.background = 'linear-gradient(135deg, #e74c3c, #c0392b)';
+      popup.style.color = '#fff';
+      popup.style.padding = '14px 24px';
+      popup.style.borderRadius = '12px';
+      popup.style.boxShadow = '0 10px 30px rgba(0,0,0,0.4)';
+      popup.style.zIndex = '9999';
+      popup.style.fontWeight = '600';
+      popup.style.display = 'flex';
+      popup.style.alignItems = 'center';
+      popup.style.gap = '12px';
+      popup.style.transform = 'translateY(-20px) scale(0.9)';
+      popup.style.opacity = '0';
+      popup.style.transition = 'all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275)';
+      
+      popup.innerHTML = `
+        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="currentColor" viewBox="0 0 16 16">
+          <path d="M16 8A8 8 0 1 1 0 8a8 8 0 0 1 16 0zM8 4a.905.905 0 0 0-.9.995l.35 3.507a.552.552 0 0 0 1.1 0l.35-3.507A.905.905 0 0 0 8 4zm.002 6a1 1 0 1 0 0 2 1 1 0 0 0 0-2z"/>
+        </svg>
+        <span>${msg}</span>
+      `;
+      
+      document.body.appendChild(popup);
+      
+      requestAnimationFrame(() => {
+        popup.style.transform = 'translateY(0) scale(1)';
+        popup.style.opacity = '1';
+      });
+      
+      setTimeout(() => {
+        popup.style.transform = 'translateY(-20px) scale(0.9)';
+        popup.style.opacity = '0';
+        setTimeout(() => popup.remove(), 400);
+      }, 4000);
+    }
+
+    // Form Validator
+    document.querySelector('form').addEventListener('submit', function(e) {
+      if (selectedFiles.length < 1) {
+        e.preventDefault();
+        showErrorPopup('Please select at least 1 photo for professional review.');
+      } else if (selectedFiles.length > 3) {
+        e.preventDefault();
+        showErrorPopup('You can only upload up to 3 photos maximum.');
+      }
+    });
   })();
 </script>
 {% endblock %}

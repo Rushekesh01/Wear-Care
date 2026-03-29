@@ -1,0 +1,16 @@
+c:\Users\Rushekesh Dusane\OneDrive\Desktop\project\Wear & Care\app.py
+  c:\Users\Rushekesh Dusane\OneDrive\Desktop\project\Wear & Care\app.py:151:55 - error: Argument of type "dict[str, str | None]" cannot be assigned to parameter "credentials" of type "SignInWithPasswordCredentials" in function "sign_in_with_password"
+  ????Type "dict[str, str | None]" is not assignable to type "SignInWithPasswordCredentials"
+  ????????"dict[str, str | None]" is not assignable to "SignInWithEmailAndPasswordCredentials"
+  ????????"dict[str, str | None]" is not assignable to "SignInWithPhoneAndPasswordCredentials" (reportArgumentType)
+  c:\Users\Rushekesh Dusane\OneDrive\Desktop\project\Wear & Care\app.py:157:39 - error: "id" is not a known attribute of "None" (reportOptionalMemberAccess)
+  c:\Users\Rushekesh Dusane\OneDrive\Desktop\project\Wear & Care\app.py:158:41 - error: "user_metadata" is not a known attribute of "None" (reportOptionalMemberAccess)
+  c:\Users\Rushekesh Dusane\OneDrive\Desktop\project\Wear & Care\app.py:159:42 - error: "email" is not a known attribute of "None" (reportOptionalMemberAccess)
+  c:\Users\Rushekesh Dusane\OneDrive\Desktop\project\Wear & Care\app.py:186:39 - error: Argument of type "dict[str, str | Any | dict[str, dict[str, Any | None]] | None]" cannot be assigned to parameter "credentials" of type "SignUpWithPasswordCredentials" in function "sign_up"
+  ????Type "dict[str, str | Any | dict[str, dict[str, Any | None]] | None]" is not assignable to type "SignUpWithPasswordCredentials"
+  ????????"dict[str, str | Any | dict[str, dict[str, Any | None]] | None]" is not assignable to "SignUpWithEmailAndPasswordCredentials"
+  ????????"dict[str, str | Any | dict[str, dict[str, Any | None]] | None]" is not assignable to "SignUpWithPhoneAndPasswordCredentials" (reportArgumentType)
+  c:\Users\Rushekesh Dusane\OneDrive\Desktop\project\Wear & Care\app.py:313:67 - error: Argument of type "str | None" cannot be assigned to parameter "filename" of type "str" in function "secure_filename"
+  ????Type "str | None" is not assignable to type "str"
+  ????????"None" is not assignable to "str" (reportArgumentType)
+6 errors, 0 warnings, 0 informations

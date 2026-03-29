@@ -32,16 +32,19 @@
 
   <div class="row g-3">
     {% for d in donations %}
-      {% set image = (d[6] if d|length > 6 else '') %}
+      {% set images_list = d[6].split(',') if d|length > 6 and d[6] else [] %}
+      {% set image = images_list[0] if images_list|length > 0 else '' %}
       {% set status = (d[7] if d|length > 7 else '') %}
       {% set is_free = (d[10] if d|length > 10 else 1) %}
       {% set price = (d[11] if d|length > 11 else None) %}
       <div class="col-md-6 col-lg-4">
         <div class="wc-card h-100">
           {% if image %}
-            <img class="img-fluid" style="border-top-left-radius: var(--wc-radius); border-top-right-radius: var(--wc-radius); aspect-ratio: 4/3; object-fit: cover;"
-                 src="{{ url_for('static', filename='uploads/' + image) }}"
-                 alt="Donation photo">
+            <div style="background-color: rgba(0,0,0,0.25); border-top-left-radius: var(--wc-radius); border-top-right-radius: var(--wc-radius); display: flex; align-items: center; justify-content: center;">
+              <img class="img-fluid w-100" style="border-top-left-radius: var(--wc-radius); border-top-right-radius: var(--wc-radius); aspect-ratio: 4/3; object-fit: contain; padding: 0.25rem;"
+                   src="{{ url_for('static', filename='uploads/' + image) }}"
+                   alt="Donation photo">
+            </div>
           {% endif %}
           <div class="wc-card-body">
             <div class="d-flex justify-content-between align-items-start gap-2">

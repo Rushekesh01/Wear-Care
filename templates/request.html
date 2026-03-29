@@ -18,10 +18,17 @@
     <div class="wc-card-body">
       <div class="row g-3 align-items-start">
         <div class="col-md-4">
-          {% if image %}
-            <img class="img-fluid" style="border-radius: var(--wc-radius); aspect-ratio: 4/3; object-fit: cover;"
-                 src="{{ url_for('static', filename='uploads/' + image) }}"
-                 alt="Donation photo">
+          {% set images = image_str.split(',') if image_str else [] %}
+          {% if images|length > 0 %}
+            <div class="d-flex flex-column gap-2 mb-3">
+              {% for img in images %}
+                <div style="background-color: rgba(0,0,0,0.25); border-radius: var(--wc-radius); display: flex; align-items: center; justify-content: center;">
+                  <img class="img-fluid w-100" style="border-radius: var(--wc-radius); aspect-ratio: 4/3; object-fit: contain; padding: 0.25rem;"
+                       src="{{ url_for('static', filename='uploads/' + img) }}"
+                       alt="Donation photo {{ loop.index }}">
+                </div>
+              {% endfor %}
+            </div>
           {% else %}
             <div class="wc-card" style="border-radius: var(--wc-radius); padding: 1.25rem;">
               <div class="wc-muted">No photo uploaded.</div>
