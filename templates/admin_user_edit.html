@@ -32,13 +32,13 @@
               <div class="col-12">
                 <label class="form-label" for="password">New password (optional)</label>
                 <input class="form-control" id="password" name="password" type="password" placeholder="Leave blank to keep existing">
-                <div class="form-text wc-muted">If you enter a password here, it will overwrite the current password.</div>
+                <div class="form-text text-secondary">If you enter a password here, it will overwrite the current password.</div>
               </div>
               <div class="col-12">
                 <button class="btn btn-wc-accent w-100" type="submit">Save changes</button>
               </div>
-              <div class="col-12 small wc-muted">
-                User ID: <span class="text-white">{{ user[0] }}</span> • Created: <span class="text-white">{{ user[3] if user|length > 3 and user[3] else '—' }}</span>
+              <div class="col-12 small text-secondary">
+                👤 User ID: <span class="fw-semibold text-primary">{{ user[0] }}</span> • Created: <span class="fw-semibold text-primary">{{ user[3] if user|length > 3 and user[3] else '—' }}</span>
               </div>
             </div>
           </form>

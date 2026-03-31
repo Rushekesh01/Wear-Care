@@ -12,13 +12,43 @@ from dotenv import load_dotenv # type: ignore
 from supabase import create_client, Client # type: ignore
 
 load_dotenv()
-url = os.environ.get("SUPABASE_URL", "")
-key = os.environ.get("SUPABASE_KEY", "")
+
+# Safely parse Supabase credentials to prevent parsing errors on Render (e.g. from accidental quotes)
+url = os.environ.get("SUPABASE_URL", "").strip().strip('"').strip("'")
+key = os.environ.get("SUPABASE_KEY", "").strip().strip('"').strip("'")
 supabase: Client = create_client(url, key)
 
 # GMAIL SMTP SETUP
-GMAIL_USER = os.environ.get("GMAIL_SMTP_USER", "")
-GMAIL_APP_PASSWORD = os.environ.get("GMAIL_SMTP_PASSWORD", "")
+GMAIL_USER = os.environ.get("GMAIL_SMTP_USER", "").strip()
+GMAIL_APP_PASSWORD = os.environ.get("GMAIL_SMTP_PASSWORD", "").strip()
+
+# ADMIN CREDENTIALS (loaded from .env) - LEGACY, use get_admin_credentials() instead
+ADMIN_EMAIL = os.environ.get("ADMIN_EMAIL", "admin@wearandcare.com").strip()
+ADMIN_PASSWORD = os.environ.get("ADMIN_PASSWORD", "WearCare@2026").strip()
+
+def get_admin_credentials():
+    """Get admin credentials from .env file (dynamic loading)"""
+    import re
+    env_path = os.path.join(os.path.dirname(__file__), '.env')
+    admin_email = "admin@wearandcare.com"
+    admin_password = "WearCare@2026"
+    
+    try:
+        if os.path.exists(env_path):
+            with open(env_path, 'r') as f:
+                content = f.read()
+                # Extract ADMIN_EMAIL
+                email_match = re.search(r'^ADMIN_EMAIL=(.+)$', content, re.MULTILINE)
+                if email_match:
+                    admin_email = email_match.group(1).strip().strip('"').strip("'")
+                # Extract ADMIN_PASSWORD
+                password_match = re.search(r'^ADMIN_PASSWORD=(.+)$', content, re.MULTILINE)
+                if password_match:
+                    admin_password = password_match.group(1).strip().strip('"').strip("'")
+    except Exception as e:
+        print(f"Error reading admin credentials from .env: {e}")
+    
+    return admin_email, admin_password
 
 def send_otp_email(to_email, otp_code, action_text="Verification"):
     if not GMAIL_USER or not GMAIL_APP_PASSWORD:
@@ -34,17 +64,33 @@ def send_otp_email(to_email, otp_code, action_text="Verification"):
         body = f"Hello,\n\nYour 6-digit OTP for {action_text} is: {otp_code}\n\nPlease enter this code on the website to proceed.\n\nBest Regards,\nThe Wear & Care Team"
         msg.attach(MIMEText(body, 'plain'))
         
-        server = smtplib.SMTP('smtp.gmail.com', 587)
+        # Add a 10-second timeout to prevent Gunicorn worker freezing if Gmail blocks Render IPs
+        server = smtplib.SMTP('smtp.gmail.com', 587, timeout=10)
         server.starttls()
         server.login(GMAIL_USER, GMAIL_APP_PASSWORD)
         server.send_message(msg)
         server.quit()
         print(f"OTP email successfully sent to {to_email}")
+    except smtplib.SMTPException as e:
+        print(f"SMTP Protocol Error: {str(e)}")
     except Exception as e:
         print(f"Failed to send OTP via Gmail SMTP: {str(e)}")
 
 app = Flask(__name__)
-app.secret_key = "wearcare-dev"
+# Ensure the secret key falls back securely if none is provided via Render ENV
+app.secret_key = os.environ.get("SECRET_KEY", "wearcare-dev-random-string-1234")
+
+# Global error handlers to surface 500 errors gracefully
+@app.errorhandler(500)
+def handle_500(e):
+    import traceback
+    return f"<h1>Internal Server Error</h1><p>Please check Render logs.</p><pre style='background:#f4f4f4;padding:10px'>{traceback.format_exc()}</pre>", 500
+
+@app.errorhandler(Exception)
+def handle_exception(e):
+    import traceback
+    return f"<h1>Unhandled Exception</h1><pre style='background:#f4f4f4;padding:10px'>{traceback.format_exc()}</pre>", 500
+
 
 UPLOAD_FOLDER = "static/uploads"
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
@@ -70,7 +116,14 @@ def dict_to_donation_tuple(d):
     )
 
 def dict_to_user_tuple(u):
-    return (u.get('id'), u.get('name'), u.get('email'), u.get('created_at'))
+    return (
+        u.get('id'),           # 0
+        u.get('name'),         # 1
+        u.get('email'),        # 2
+        u.get('created_at'),   # 3
+        u.get('is_flagged', False),   # 4
+        u.get('flag_reason', '')      # 5
+    )
 
 def dict_to_request_tuple(pr):
     d = pr.get('donations', {})
@@ -146,32 +199,99 @@ def login():
     if request.method == "POST":
         email = normalize_email(request.form.get("email"))
         password = request.form.get("password") or ""
-
-        try:
-            res = supabase.auth.sign_in_with_password({
-                "email": email,
-                "password": password
-            })
+        otp = request.form.get("otp")
+        
+        # Step 1: If only email provided, generate and send OTP
+        if email and not otp and not password:
+            try:
+                # Check if user exists in Supabase
+                res = supabase.auth.sign_in_with_password({
+                    "email": email,
+                    "password": "temp_check_" + str(random.randint(10000, 99999))
+                })
+            except Exception as e:
+                # Expected to fail, just checking if user exists
+                if "Invalid login credentials" not in str(e):
+                    return render_template("login.html", error="User not found. Please register first.")
             
-            user = res.user
-            if not user:
-                return render_template("login.html", error="Login failed, no user returned.")
-            session["user_id"] = user.id
-            session["user_name"] = user.user_metadata.get("name", "User") if user.user_metadata else "User"
-            session["user_email"] = user.email
-            session["is_admin"] = False
+            # Generate 6-digit OTP
+            login_otp = str(random.randint(100000, 999999))
+            session['login_otp'] = login_otp
+            session['login_email'] = email
+            session['login_password'] = password
             
-            # Send the welcome email on their actual first confirmed login if you wish, 
-            # but since they successfully confirmed their OTP, Supabase sends their token natively.
+            # Send OTP via email
+            send_otp_email(email, login_otp, "Login")
             
-            return redirect("/dashboard")
-        except Exception as e:
-            msg = str(e)
-            if "Email not confirmed" in msg:
-                return redirect(f"/verify-otp?email={email}")
-            return render_template("login.html", error="Invalid email or password (or unconfirmed account)")
+            return redirect(f"/verify-login-otp?email={email}")
+        
+        # Step 2: Verify OTP and login
+        if email and otp:
+            expected_otp = session.get('login_otp')
+            expected_email = session.get('login_email')
+            
+            if str(otp) == str(expected_otp) and email == expected_email:
+                try:
+                    # Get user from Supabase by email
+                    res = supabase.table('users').select('*').eq('email', email).execute()
+                    if res.data and len(res.data) > 0:
+                        user_data = res.data[0]
+                        session["user_id"] = user_data.get('id')
+                        session["user_name"] = user_data.get('name', 'User')
+                        session["user_email"] = email
+                        session["is_admin"] = False
+                        
+                        # Clear OTP session
+                        session.pop('login_otp', None)
+                        session.pop('login_email', None)
+                        session.pop('login_password', None)
+                        
+                        return redirect("/dashboard")
+                    else:
+                        return render_template("verify_login_otp.html", email=email, error="User not found.")
+                except Exception as e:
+                    return render_template("verify_login_otp.html", email=email, error=f"Login failed: {str(e)}")
+            else:
+                return render_template("verify_login_otp.html", email=email, error="Invalid 6-digit OTP code.")
 
     return render_template("login.html")
+
+# VERIFY LOGIN OTP
+@app.route('/verify-login-otp', methods=['GET', 'POST'])
+def verify_login_otp():
+    if request.method == 'POST':
+        email = request.form.get('email') or ""
+        otp = request.form.get('otp')
+        
+        expected_otp = session.get('login_otp')
+        expected_email = session.get('login_email')
+        
+        if str(otp) == str(expected_otp) and email == expected_email:
+            try:
+                # Get user from Supabase by email
+                res = supabase.table('users').select('*').eq('email', email).execute()
+                if res.data and len(res.data) > 0:
+                    user_data = res.data[0]
+                    session["user_id"] = user_data.get('id')
+                    session["user_name"] = user_data.get('name', 'User')
+                    session["user_email"] = email
+                    session["is_admin"] = False
+                    
+                    # Clear OTP session
+                    session.pop('login_otp', None)
+                    session.pop('login_email', None)
+                    
+                    flash("Login successful!", "success")
+                    return redirect("/dashboard")
+                else:
+                    return render_template("verify_login_otp.html", email=email, error="User not found.")
+            except Exception as e:
+                return render_template("verify_login_otp.html", email=email, error=f"Login failed: {str(e)}")
+        else:
+            return render_template("verify_login_otp.html", email=email, error="Invalid 6-digit OTP code.")
+    
+    email = request.args.get('email', '')
+    return render_template("verify_login_otp.html", email=email)
 
 # VERIFY OTP
 @app.route('/verify-otp', methods=['GET', 'POST'])
@@ -254,17 +374,85 @@ def reset_password():
 @app.route('/admin-login', methods=['GET','POST'])
 def admin_login():
     if request.method == "POST":
-        email = request.form.get("email")
-        password = request.form.get("password")
+        email = (request.form.get("email") or "").strip().lower()
+        password = request.form.get("password") or ""
+        
+        # Get current admin credentials from .env (dynamic loading)
+        admin_email, admin_password = get_admin_credentials()
 
-        if email == "admin@rushi.com" and password == "admin123":
+        if email == admin_email.lower() and password == admin_password:
             session["user_id"] = "admin"
             session["user_name"] = "Admin"
             session["is_admin"] = True
+            flash("Welcome back, Admin!", "success")
             return redirect("/admin")
         
-        return render_template("admin_login.html", error="Invalid admin credentials")
+        return render_template("admin_login.html", error="Invalid admin email or password.")
     return render_template("admin_login.html")
+
+# ADMIN SETTINGS - Change email / password
+@app.route('/admin/settings', methods=['GET', 'POST'])
+@admin_required
+def admin_settings():
+    success = None
+    error = None
+
+    if request.method == 'POST':
+        action = request.form.get('action')
+        # Get current credentials from .env
+        current_email, current_password = get_admin_credentials()
+
+        if action == 'change_email':
+            new_email = (request.form.get('new_email') or '').strip().lower()
+            confirm_pass = request.form.get('confirm_password') or ''
+            if confirm_pass != current_password:
+                error = "Current password is incorrect."
+            elif not new_email:
+                error = "Please enter a valid email."
+            else:
+                # Update .env file
+                _update_env('ADMIN_EMAIL', new_email)
+                success = f"Admin email updated to {new_email}. You can now login with the new email."
+
+        elif action == 'change_password':
+            current_pass = request.form.get('current_password') or ''
+            new_pass = request.form.get('new_password') or ''
+            confirm_new = request.form.get('confirm_new_password') or ''
+            if current_pass != current_password:
+                error = "Current password is incorrect."
+            elif len(new_pass) < 6:
+                error = "New password must be at least 6 characters."
+            elif new_pass != confirm_new:
+                error = "New passwords do not match."
+            else:
+                # Update .env file
+                _update_env('ADMIN_PASSWORD', new_pass)
+                success = "Admin password updated successfully! You can login with the new password."
+
+    # Get current credentials for display
+    current_email, current_password = get_admin_credentials()
+    
+    return render_template('admin_settings.html',
+                           admin_email=current_email,
+                           success=success, error=error)
+
+def _update_env(key, value):
+    """Update a key in the .env file."""
+    import re
+    env_path = os.path.join(os.path.dirname(__file__), '.env')
+    try:
+        with open(env_path, 'r') as f:
+            content = f.read()
+        pattern = rf'^{re.escape(key)}=.*$'
+        new_line = f'{key}={value}'
+        if re.search(pattern, content, re.MULTILINE):
+            content = re.sub(pattern, new_line, content, flags=re.MULTILINE)
+        else:
+            content += f'\n{new_line}\n'
+        with open(env_path, 'w') as f:
+            f.write(content)
+    except Exception as e:
+        print(f'Could not update .env: {e}')
 
 # LOGOUT
 @app.route("/logout")
@@ -420,20 +608,189 @@ def dashboard():
 @app.route('/admin')
 @admin_required
 def admin():
-    res = supabase.table("donations").select("*").order('id', desc=True).execute()
-    data = [dict_to_donation_tuple(d) for d in res.data]
-    return render_template("admin.html", donations=data)
+    # Donations
+    don_res = supabase.table("donations").select("*").order('id', desc=True).execute()
+    data = [dict_to_donation_tuple(d) for d in don_res.data]
+    all_donations_raw = don_res.data
+
+    # Users
+    user_res = supabase.table("users").select("*").order('created_at', desc=True).execute()
+    users_raw = user_res.data
+
+    # Purchase Requests
+    try:
+        pr_res = supabase.table("purchase_requests").select("*, donations(cloth_type), users!purchase_requests_buyer_user_id_fkey(name)").order('id', desc=True).execute()
+        purchase_requests = []
+        for r in pr_res.data:
+            entry = dict(r)
+            entry['cloth_type'] = r.get('donations', {}).get('cloth_type') if r.get('donations') else None
+            entry['buyer_name'] = r.get('users', {}).get('name') if r.get('users') else None
+            purchase_requests.append(entry)
+    except Exception:
+        pr_res = supabase.table("purchase_requests").select("*").order('id', desc=True).execute()
+        purchase_requests = pr_res.data
+    all_requests_raw = pr_res.data if hasattr(pr_res, 'data') else purchase_requests
+
+    # --- Smart behavior stats per user ---
+    # Build lookup: user_id -> stats
+    user_stats = {}
+    for u in users_raw:
+        uid = u.get('id')
+        # count donations
+        donations_count = sum(1 for d in all_donations_raw if d.get('user_id') == uid)
+        rejected_donations = sum(1 for d in all_donations_raw if d.get('user_id') == uid and d.get('status') == 'Rejected')
+        # no-phone donations
+        no_phone_donations = sum(1 for d in all_donations_raw if d.get('user_id') == uid and not d.get('phone'))
+        # requests made
+        requests_made = sum(1 for r in all_requests_raw if r.get('buyer_user_id') == uid)
+        # rejected requests
+        rejected_requests = sum(1 for r in all_requests_raw if r.get('buyer_user_id') == uid and r.get('status') == 'Rejected')
+
+        # Auto-risk score (0 = safe, higher = more suspicious)
+        risk_score = 0
+        risk_reasons = []
+
+        if rejected_donations > 0:
+            risk_score += rejected_donations * 2
+            risk_reasons.append(f"{rejected_donations} donation(s) rejected by admin")
+        if no_phone_donations > 0 and donations_count > 0:
+            risk_score += no_phone_donations
+            risk_reasons.append(f"{no_phone_donations} donation(s) submitted without phone number")
+        if requests_made >= 5 and rejected_requests >= 3:
+            risk_score += 3
+            risk_reasons.append(f"High rejection rate on requests ({rejected_requests}/{requests_made})")
+        if requests_made >= 10:
+            risk_score += 2
+            risk_reasons.append(f"Unusually high number of requests ({requests_made})")
+
+        # Manual flag overrides auto-score
+        is_flagged = u.get('is_flagged', False)
+        flag_reason = u.get('flag_reason', '')
+
+        user_stats[uid] = {
+            'donations_count': donations_count,
+            'rejected_donations': rejected_donations,
+            'requests_made': requests_made,
+            'rejected_requests': rejected_requests,
+            'risk_score': risk_score,
+            'risk_reasons': risk_reasons,
+            'is_flagged': is_flagged,
+            'flag_reason': flag_reason,
+        }
+
+    users = [dict_to_user_tuple(u) for u in users_raw]
+
+    return render_template("admin.html", donations=data, users=users,
+                           purchase_requests=purchase_requests,
+                           user_stats=user_stats, active_page="admin")
 
 @app.route('/listings')
 def listings():
     user_id = session.get("user_id")
-    if user_id and not session.get("is_admin"):
-        res = supabase.table("donations").select("*").neq("user_id", user_id).order('id', desc=True).execute()
-    else:
-        res = supabase.table("donations").select("*").order('id', desc=True).execute()
+    
+    # Get query parameters
+    search = request.args.get('search', '').strip().lower()
+    cloth_type = request.args.get('cloth_type', '').strip()
+    size_filter = request.args.get('size', '').strip()
+    condition = request.args.get('condition', '').strip()
+    price_type = request.args.get('price_type', '').strip()  # 'free' or 'paid'
+    sort_by = request.args.get('sort_by', 'newest')
+    page = int(request.args.get('page', 1))
+    items_per_page = 12
+    
+    try:
+        # Get all donations first (Supabase limitations)
+        if user_id and not session.get("is_admin"):
+            res = supabase.table("donations").select("*").neq("user_id", user_id).execute()
+        else:
+            res = supabase.table("donations").select("*").execute()
         
-    data = [dict_to_donation_tuple(d) for d in res.data]
-    return render_template("listings.html", donations=data, active_page="listings")
+        donations = res.data if res.data else []
+        
+        # Filter by search term (searching in cloth_type, condition, and donor name)
+        if search:
+            donations = [d for d in donations if 
+                search in (d.get('cloth_type', '') or '').lower() or
+                search in (d.get('condition_status', '') or '').lower() or
+                search in (d.get('user_name', '') or '').lower()
+            ]
+        
+        # Filter by cloth type
+        if cloth_type:
+            donations = [d for d in donations if (d.get('cloth_type', '') or '') == cloth_type]
+        
+        # Filter by size
+        if size_filter:
+            donations = [d for d in donations if (d.get('size', '') or '') == size_filter]
+        
+        # Filter by condition
+        if condition:
+            donations = [d for d in donations if (d.get('condition_status', '') or '') == condition]
+        
+        # Filter by price type
+        if price_type == 'free':
+            donations = [d for d in donations if d.get('is_free', True)]
+        elif price_type == 'paid':
+            donations = [d for d in donations if not d.get('is_free', True)]
+        
+        # Sort
+        if sort_by == 'newest':
+            donations.sort(key=lambda x: x.get('id', 0), reverse=True)
+        elif sort_by == 'oldest':
+            donations.sort(key=lambda x: x.get('id', 0))
+        elif sort_by == 'price_low':
+            donations.sort(key=lambda x: x.get('price', 0) if x.get('price') else float('inf'))
+        elif sort_by == 'price_high':
+            donations.sort(key=lambda x: x.get('price', 0) if x.get('price') else 0, reverse=True)
+        
+        # Pagination
+        total_items = len(donations)
+        total_pages = (total_items + items_per_page - 1) // items_per_page
+        page = max(1, min(page, total_pages))
+        
+        start_idx = (page - 1) * items_per_page
+        end_idx = start_idx + items_per_page
+        paginated_donations = donations[start_idx:end_idx]
+        
+        data = [dict_to_donation_tuple(d) for d in paginated_donations]
+        
+        # Define comprehensive filter options
+        # Predefined options that will always be available
+        predefined_cloth_types = [
+            'T-Shirt', 'Shirt', 'Jeans', 'Dress', 'Skirt', 'Jacket', 'Coat', 'Sweater',
+            'Hoodie', 'Pants', 'Shorts', 'Top', 'Blouse', 'Suit', 'Blazer',
+            'Vest', 'Cardigan', 'Leggings', 'Saree', 'Kurta', 'Other'
+        ]
+        predefined_sizes = ['XS', 'S', 'M', 'L', 'XL', 'XXL', 'Free Size']
+        predefined_conditions = ['Like New', 'Good', 'Average', 'Fair', 'Worn']
+        
+        # Get unique values from actual donations
+        db_cloth_types = sorted(set(d.get('cloth_type', '') for d in donations if d.get('cloth_type')))
+        db_sizes = sorted(set(d.get('size', '') for d in donations if d.get('size')))
+        db_conditions = sorted(set(d.get('condition_status', '') for d in donations if d.get('condition_status')))
+        
+        # Merge predefined options with database values
+        all_cloth_types = sorted(set(predefined_cloth_types + db_cloth_types))
+        all_sizes = sorted(set(predefined_sizes + db_sizes))
+        all_conditions = sorted(set(predefined_conditions + db_conditions))
+        
+        return render_template("listings.html", 
+                             donations=data, 
+                             active_page="listings",
+                             current_page=page,
+                             total_pages=total_pages,
+                             total_items=total_items,
+                             cloth_types=all_cloth_types,
+                             sizes=all_sizes,
+                             conditions=all_conditions,
+                             search=search,
+                             cloth_type=cloth_type,
+                             size_filter=size_filter,
+                             condition=condition,
+                             price_type=price_type,
+                             sort_by=sort_by)
+    except Exception as e:
+        return render_template("listings.html", donations=[], active_page="listings", error=str(e))
 
 @app.route('/requests')
 @login_required
@@ -496,7 +853,37 @@ def admin_delete_user(user_id):
     # To truly delete a user, we should delete via auth endpoints or let public.user be deleted.
     supabase.table("users").delete().eq("id", user_id).execute()
     flash("User deleted.", "success")
-    return redirect("/admin/users")
+    return redirect("/admin")
+
+# ADMIN: FLAG USER as Suspicious
+@app.route('/admin/users/<user_id>/flag', methods=['POST'])
+@admin_required
+def admin_flag_user(user_id):
+    reason = (request.form.get('reason') or 'Suspicious activity').strip()
+    try:
+        supabase.table("users").update({
+            "is_flagged": True,
+            "flag_reason": reason
+        }).eq("id", user_id).execute()
+        flash(f"User flagged as suspicious: {reason}", "warning")
+    except Exception as e:
+        # Column might not exist yet - handle gracefully
+        flash(f"Could not flag user. Make sure 'is_flagged' and 'flag_reason' columns exist in Supabase users table. Error: {str(e)}", "danger")
+    return redirect("/admin")
+
+# ADMIN: UNFLAG USER (mark as safe)
+@app.route('/admin/users/<user_id>/unflag', methods=['POST'])
+@admin_required
+def admin_unflag_user(user_id):
+    try:
+        supabase.table("users").update({
+            "is_flagged": False,
+            "flag_reason": ""
+        }).eq("id", user_id).execute()
+        flash("User cleared — marked as safe.", "success")
+    except Exception as e:
+        flash(f"Could not unflag user: {str(e)}", "danger")
+    return redirect("/admin")
 
 # ADMIN: EDIT DONATION/LISTING
 @app.route('/admin/donations/<int:donation_id>/edit', methods=['GET', 'POST'])
@@ -553,6 +940,59 @@ def admin_delete_donation(donation_id):
     flash("Listing deleted.", "success")
     return redirect("/admin")
 
+# ADMIN: Purchase Request Approve
+@app.route('/admin/requests/<int:request_id>/approve', methods=['POST'])
+@admin_required
+def admin_approve_request(request_id):
+    try:
+        pr_res = supabase.table("purchase_requests").select("donation_id, buyer_user_id").eq("id", request_id).execute()
+        if pr_res.data:
+            donation_id = pr_res.data[0]['donation_id']
+            buyer_user_id = pr_res.data[0]['buyer_user_id']
+            supabase.table("purchase_requests").update({"status": "Approved"}).eq("id", request_id).execute()
+            try:
+                supabase.table("notifications").insert({"user_id": buyer_user_id, "message": f"Your request for listing #{donation_id} has been Approved by Admin."}).execute()
+            except Exception:
+                pass
+            flash("Request approved.", "success")
+        else:
+            flash("Request not found.", "warning")
+    except Exception as e:
+        flash(f"Error: {str(e)}", "danger")
+    return redirect("/admin#requests")
+
+# ADMIN: Purchase Request Reject
+@app.route('/admin/requests/<int:request_id>/reject', methods=['POST'])
+@admin_required
+def admin_reject_request(request_id):
+    try:
+        pr_res = supabase.table("purchase_requests").select("donation_id, buyer_user_id").eq("id", request_id).execute()
+        if pr_res.data:
+            donation_id = pr_res.data[0]['donation_id']
+            buyer_user_id = pr_res.data[0]['buyer_user_id']
+            supabase.table("purchase_requests").update({"status": "Rejected"}).eq("id", request_id).execute()
+            try:
+                supabase.table("notifications").insert({"user_id": buyer_user_id, "message": f"Your request for listing #{donation_id} has been Rejected by Admin."}).execute()
+            except Exception:
+                pass
+            flash("Request rejected.", "success")
+        else:
+            flash("Request not found.", "warning")
+    except Exception as e:
+        flash(f"Error: {str(e)}", "danger")
+    return redirect("/admin#requests")
+
+# ADMIN: Purchase Request Delete
+@app.route('/admin/requests/<int:request_id>/delete', methods=['POST'])
+@admin_required
+def admin_delete_request(request_id):
+    try:
+        supabase.table("purchase_requests").delete().eq("id", request_id).execute()
+        flash("Request deleted.", "success")
+    except Exception as e:
+        flash(f"Error: {str(e)}", "danger")
+    return redirect("/admin#requests")
+
 # BUY/REQUEST
 @app.route('/request/<int:donation_id>')
 @login_required
@@ -584,22 +1024,36 @@ def request_listing(donation_id):
         request_sent = True
         request_status = req_res.data[0]['status']
 
-    phone = d[11] if request_status == "Approved" else None
+    # Get donor contact info if request is approved
+    phone = None
+    email = None
+    if request_status == "Approved":
+        # Phone is stored in donations table at d[9]
+        phone = d[9] if d[9] else None
+        donor_user_id = res.data[0].get('user_id')
+        if donor_user_id:
+            try:
+                donor_res = supabase.table("users").select("email").eq("id", donor_user_id).execute()
+                if donor_res.data:
+                    email = donor_res.data[0].get('email')
+            except Exception:
+                pass
 
     return render_template(
         "request.html",
         donation_id=donation_id,
-        donor_name=d[2],
-        cloth=d[3],
-        size=d[4],
-        condition=d[5],
+        donor_name=d[1],
+        cloth=d[2],
+        size=d[3],
+        condition=d[4],
         status=status,
         image_str=image_str,
         is_free=is_free,
         price=price,
         request_sent=request_sent,
         request_status=request_status,
-        phone=phone
+        phone=phone,
+        email=email
     )
 
 @app.route('/send-request/<int:donation_id>', methods=['POST'])

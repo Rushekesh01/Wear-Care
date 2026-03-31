@@ -1,0 +1,110 @@
+{% extends 'base.html' %}
+
+{% block title %}Admin Settings — Wear & Care{% endblock %}
+
+{% block content %}
+<section class="wc-section pt-0">
+  <div class="d-flex flex-column flex-md-row align-items-md-end justify-content-between gap-2 mb-4">
+    <div>
+      <h1 class="h2 fw-bold wc-title mb-1">Admin Settings</h1>
+      <p class="wc-lead mb-0">Change your admin login email and password.</p>
+    </div>
+    <div class="d-flex gap-2">
+      <a href="/admin" class="btn btn-wc-ghost">← Back to Admin Panel</a>
+    </div>
+  </div>
+
+  {% if success %}
+    <div class="alert alert-success alert-dismissible fade show mb-4" role="alert">
+      <strong>✓ Success!</strong> {{ success }}
+      <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    </div>
+  {% endif %}
+  {% if error %}
+    <div class="alert alert-danger alert-dismissible fade show mb-4" role="alert">
+      <strong>✗ Error!</strong> {{ error }}
+      <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    </div>
+  {% endif %}
+
+  <!-- Current Info -->
+  <div class="wc-card mb-4">
+    <div class="wc-card-body">
+      <div class="fw-bold mb-2" style="font-size:1.1rem;">Current Admin Info</div>
+      <div class="wc-muted">
+        Email: <span class="text-white fw-semibold">{{ admin_email }}</span>
+      </div>
+      <div class="wc-muted mt-1">
+        Password: <span class="text-white fw-semibold">••••••••</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="row g-4">
+
+    <!-- Change Email -->
+    <div class="col-md-6">
+      <div class="wc-card h-100">
+        <div class="wc-card-body">
+          <div class="fw-bold mb-3" style="font-size:1.1rem;">Change Email</div>
+          <form method="POST" action="/admin/settings">
+            <input type="hidden" name="action" value="change_email">
+            <div class="mb-3">
+              <label class="form-label">New Email Address</label>
+              <input type="email" name="new_email" class="form-control"
+                     placeholder="newadmin@email.com" required>
+            </div>
+            <div class="mb-3">
+              <label class="form-label">Confirm Current Password</label>
+              <input type="password" name="confirm_password" class="form-control"
+                     placeholder="Enter current password to confirm" required>
+            </div>
+            <button type="submit" class="btn btn-wc-primary w-100">Update Email</button>
+          </form>
+        </div>
+      </div>
+    </div>
+
+    <!-- Change Password -->
+    <div class="col-md-6">
+      <div class="wc-card h-100">
+        <div class="wc-card-body">
+          <div class="fw-bold mb-3" style="font-size:1.1rem;">Change Password</div>
+          <form method="POST" action="/admin/settings">
+            <input type="hidden" name="action" value="change_password">
+            <div class="mb-3">
+              <label class="form-label">Current Password</label>
+              <input type="password" name="current_password" class="form-control"
+                     placeholder="Enter your current password" required>
+            </div>
+            <div class="mb-3">
+              <label class="form-label">New Password</label>
+              <input type="password" name="new_password" class="form-control"
+                     placeholder="Min. 6 characters" required minlength="6">
+            </div>
+            <div class="mb-3">
+              <label class="form-label">Confirm New Password</label>
+              <input type="password" name="confirm_new_password" class="form-control"
+                     placeholder="Repeat new password" required>
+            </div>
+            <button type="submit" class="btn btn-wc-primary w-100">Update Password</button>
+          </form>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- Important Note -->
+  <div class="wc-card mt-4" style="border: 1px solid rgba(76,175,80,0.4); background: rgba(76,175,80,0.07);">
+    <div class="wc-card-body">
+      <div class="fw-bold mb-2" style="color:#4caf50;">✓ How It Works</div>
+      <div class="wc-muted small">
+        <p class="mb-2"><strong>Changes take effect immediately.</strong> After updating your credentials, use the new email/password to login next time.</p>
+        <p class="mb-2">Your <code>.env</code> file is automatically updated with the new values.</p>
+        <p class="mb-0"><strong>Don't forget your credentials!</strong> Keep them in a safe place. If you forget them, manually edit the <code>.env</code> file in your project directory.</p>
+      </div>
+    </div>
+  </div>
+</section>
+{% endblock %}

@@ -72,16 +72,16 @@
               </div>
 
               <div class="col-12 d-flex flex-column flex-sm-row gap-2 justify-content-between align-items-sm-center">
-                <div class="small wc-muted">Listing ID: <span class="text-white">{{ donation[0] }}</span></div>
+                <div class="small text-secondary">Listing ID: <span class="fw-semibold text-primary">{{ donation[0] }}</span></div>
                 <button class="btn btn-wc-accent" type="submit">Save changes</button>
               </div>
             </div>
           </form>
 
           {% if donation|length > 6 and donation[6] %}
-            <div class="mt-3 small wc-muted">
-              Current image:
-              <a class="link-light" href="{{ url_for('static', filename='uploads/' + donation[6]) }}" target="_blank" rel="noopener">View</a>
+            <div class="mt-3 small text-secondary">
+              🖼️ Current image:
+              <a class="link-primary fw-semibold" href="{{ url_for('static', filename='uploads/' + donation[6]) }}" target="_blank" rel="noopener">View image</a>
             </div>
           {% endif %}
         </div>
