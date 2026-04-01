@@ -177,6 +177,9 @@ def register():
         if not name or not email or not password:
             return render_template("register.html", error="Please fill all fields")
             
+        if len(password) < 6:
+            return render_template("register.html", error="Password should be at least 6 characters.")
+            
         if not validate_email(email):
             return render_template("register.html", error="Please enter a valid email address (e.g., user@example.com)")
 
