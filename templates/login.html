@@ -26,6 +26,7 @@
               <div class="alert alert-danger mb-3" role="alert">{{ error }}</div>
             {% endif %}
             
+            {% set prefilled_email = request.args.get('email') or request.form.get('email', '') %}
             <div class="mb-3">
               <label class="form-label" for="email">Email address</label>
               <input 
@@ -34,14 +35,33 @@
                 type="email" 
                 name="email" 
                 placeholder="your@email.com"
-                value="{{ request.form.get('email', '') }}"
+                value="{{ prefilled_email }}"
                 autocomplete="username"
                 required
-                autofocus
+                {% if not prefilled_email %}autofocus{% endif %}
+                {% if prefilled_email %}readonly style="background-color: rgba(255, 255, 255, 0.1); border-color: transparent;"{% endif %}
               >
             </div>
 
-            <button class="btn btn-wc-primary w-100" type="submit">Send OTP</button>
+            {% if prefilled_email %}
+              <div class="mb-3">
+                <label class="form-label" for="password">Password</label>
+                <input 
+                  class="form-control" 
+                  id="password" 
+                  type="password" 
+                  name="password" 
+                  placeholder="Enter your password"
+                  autocomplete="current-password"
+                  required
+                  autofocus
+                >
+              </div>
+            {% endif %}
+
+            <button class="btn btn-wc-primary w-100" type="submit">
+              {% if prefilled_email %}Verify & Log In{% else %}Send OTP{% endif %}
+            </button>
 
             <div class="text-center mt-4">
               <div class="small wc-muted">

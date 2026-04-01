@@ -1,4 +1,4 @@
-from flask import Flask, render_template, request, redirect, session, flash # type: ignore
+from flask import Flask, render_template, request, redirect, session, flash, url_for # type: ignore
 import os
 import smtplib
 import random
@@ -209,8 +209,34 @@ def login():
         email = normalize_email(request.form.get("email"))
         otp = request.form.get("otp")
         
-        # Step 1: If only email provided (or password provided but we want OTP), generate and send OTP
-        if email and not otp:
+        # New Case: Password-based login (specifically for post-OTP registration flow)
+        password = request.form.get("password")
+        if email and password:
+            try:
+                # Login via Supabase Auth with password
+                auth_res = supabase.auth.sign_in_with_password({
+                    "email": email,
+                    "password": password
+                })
+                
+                # If successful, get user data from public.users
+                res = supabase.table('users').select('*').eq('email', email).execute()
+                if res.data and len(res.data) > 0:
+                    user_data = res.data[0]
+                    session["user_id"] = user_data.get('id')
+                    session["user_name"] = user_data.get('name', 'User')
+                    session["user_email"] = email
+                    session["is_admin"] = False
+                    
+                    flash("Login successful!", "success")
+                    return redirect("/dashboard")
+                else:
+                    return render_template("login.html", error="User data not found.")
+            except Exception as e:
+                return render_template("login.html", email=email, error=f"Login failed: {str(e)}")
+
+        # Step 1: If only email provided, generate and send OTP
+        if email and not otp and not password:
             # Check if user exists first to provide better error message
             try:
                 res = supabase.table('users').select('id').eq('email', email).execute()
@@ -287,8 +313,8 @@ def verify_otp():
                 session.pop('signup_name', None)
                 session.pop('signup_password', None)
                 
-                flash("Account verified and created successfully! Please log in.", "success")
-                return redirect("/login")
+                flash("Account verified successfully! Please enter your password to complete the login.", "success")
+                return redirect(url_for('login', email=email))
             except Exception as e:
                 return render_template("verify_otp.html", error=f"Verification failed: {str(e)}")
         else:
