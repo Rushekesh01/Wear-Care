@@ -282,6 +282,10 @@ def verify_otp():
                             user_data = user_res.data[0]
                             session["user_id"] = user_data.get('id')
                             session["user_name"] = user_data.get('name', 'User')
+                        if user_res.data and len(user_res.data) > 0:
+                            user_data = user_res.data[0]
+                            session["user_id"] = user_data.get('id')
+                            session["user_name"] = user_data.get('name', 'User')
                             session["user_email"] = email
                             session["is_admin"] = False
                             
@@ -293,11 +297,17 @@ def verify_otp():
                             
                             flash("Registration complete! Welcome to the Donation Platform.", "success")
                             return redirect("/dashboard")
-                    except Exception:
-                        # Fallback: Redirect to login if auto-login fails
-                        flash("Account verified! Please log in.", "success")
+                        else:
+                            # If for some reason the internal table is out of sync
+                            flash("Account verified! Please log in to your dashboard.", "success")
+                            return redirect(url_for('login', email=email))
+                    except Exception as e:
+                        print(f"Auto-login failed: {e}")
+                        # Fallback: Still tell them they are verified
+                        flash("Account verified successfully! Please log in.", "success")
                         return redirect(url_for('login', email=email))
 
+                # Primary fallback
                 flash("Account verified successfully! Please log in.", "success")
                 return redirect(url_for('login', email=email))
             except Exception as e:
