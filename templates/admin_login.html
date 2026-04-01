@@ -5,38 +5,40 @@
 {% block content %}
 
 <div class="row justify-content-center">
-<div class="col-md-5">
+  <div class="col-md-5">
 
-<h2 class="mb-4">Admin Login</h2>
+    <h2 class="mb-4">Admin Login</h2>
 
-{% if error %}
-<div class="alert alert-danger">{{ error }}</div>
-{% endif %}
+    {% if error %}
+    <div class="alert alert-danger">{{ error }}</div>
+    {% endif %}
 
-<form method="POST" autocomplete="off" novalidate>
+    <form method="POST" autocomplete="off" novalidate>
 
-<div class="mb-3">
-<label>Email</label>
-<input type="email" name="email" class="form-control" placeholder="admin@wearandcare.com" autocomplete="off" autocapitalize="off" spellcheck="false" required>
-</div>
+      <div class="mb-3">
+        <label>Email</label>
+        <input type="email" name="email" class="form-control" placeholder="Enter email" autocomplete="off"
+          autocapitalize="off" spellcheck="false" required>
+      </div>
 
-<div class="mb-3">
-<label>Password</label>
-<input type="password" name="password" class="form-control" placeholder="Enter admin password" autocomplete="new-password" autocapitalize="off" spellcheck="false" required>
-</div>
+      <div class="mb-3">
+        <label>Password</label>
+        <input type="password" name="password" class="form-control" placeholder="Enter password"
+          autocomplete="new-password" autocapitalize="off" spellcheck="false" required>
+      </div>
 
-<button type="submit" class="btn btn-wc-primary w-100">Login</button>
+      <button type="submit" class="btn btn-wc-primary w-100">Login</button>
 
-</form>
+    </form>
 
-</div>
+  </div>
 </div>
 
 {% endblock %}
 
 {% block scripts %}
 <script>
-  document.addEventListener('DOMContentLoaded', function() {
+  document.addEventListener('DOMContentLoaded', function () {
     const email = document.querySelector('input[name="email"]');
     const pass = document.querySelector('input[name="password"]');
     setTimeout(function () {

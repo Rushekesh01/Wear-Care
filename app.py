@@ -7,6 +7,7 @@ from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 from functools import wraps
 from werkzeug.utils import secure_filename # type: ignore
+import re
 from dotenv import load_dotenv # type: ignore
 
 from supabase import create_client, Client # type: ignore
@@ -23,15 +24,15 @@ GMAIL_USER = os.environ.get("GMAIL_SMTP_USER", "").strip()
 GMAIL_APP_PASSWORD = os.environ.get("GMAIL_SMTP_PASSWORD", "").strip()
 
 # ADMIN CREDENTIALS (loaded from .env) - LEGACY, use get_admin_credentials() instead
-ADMIN_EMAIL = os.environ.get("ADMIN_EMAIL", "admin@wearandcare.com").strip()
-ADMIN_PASSWORD = os.environ.get("ADMIN_PASSWORD", "WearCare@2026").strip()
+ADMIN_EMAIL = os.environ.get("ADMIN_EMAIL", "admin@example.com").strip()
+ADMIN_PASSWORD = os.environ.get("ADMIN_PASSWORD", "admin123").strip()
 
 def get_admin_credentials():
     """Get admin credentials from .env file (dynamic loading)"""
     import re
     env_path = os.path.join(os.path.dirname(__file__), '.env')
-    admin_email = "admin@wearandcare.com"
-    admin_password = "WearCare@2026"
+    admin_email = "admin@example.com"
+    admin_password = "admin123"
     
     try:
         if os.path.exists(env_path):
@@ -57,11 +58,11 @@ def send_otp_email(to_email, otp_code, action_text="Verification"):
         
     try:
         msg = MIMEMultipart()
-        msg['From'] = f"Wear & Care <{GMAIL_USER}>"
+        msg['From'] = f"Community Donation Hub <{GMAIL_USER}>"
         msg['To'] = to_email
-        msg['Subject'] = f"{action_text} OTP - Wear & Care"
+        msg['Subject'] = f"{action_text} Code - Donation Platform"
         
-        body = f"Hello,\n\nYour 6-digit OTP for {action_text} is: {otp_code}\n\nPlease enter this code on the website to proceed.\n\nBest Regards,\nThe Wear & Care Team"
+        body = f"Hello,\n\nYour 6-digit verification code for {action_text} is: {otp_code}\n\nPlease enter this code on the website to proceed.\n\nBest Regards,\nThe Community Donation Team"
         msg.attach(MIMEText(body, 'plain'))
         
         # Add a 10-second timeout to prevent Gunicorn worker freezing if Gmail blocks Render IPs
@@ -155,6 +156,11 @@ def admin_required(view_func):
 def normalize_email(email):
     return (email or "").strip().lower()
 
+def validate_email(email):
+    """Check if the email is in a valid format."""
+    pattern = r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
+    return (email and re.match(pattern, email)) is not None
+
 # HOME
 @app.route('/')
 def home():
@@ -170,26 +176,29 @@ def register():
 
         if not name or not email or not password:
             return render_template("register.html", error="Please fill all fields")
+            
+        if not validate_email(email):
+            return render_template("register.html", error="Please enter a valid email address (e.g., user@example.com)")
 
-        # Check if email is already registered in the database to prevent duplicate signups
+        # Check if email is already registered
         try:
             existing_user = supabase.table('users').select('id').eq('email', email).execute()
             if existing_user.data:
                 return render_template("register.html", error="An account with this email already exists. Please log in.")
         except Exception:
-            pass # ignore errors if the db check temporarily fails
+            pass
 
-        # Generate Custom 6-Digit OTP
-        otp = str(random.randint(100000, 999999))
-        session['signup_otp'] = otp
+        # Generate 6-digit OTP
+        signup_otp = str(random.randint(100000, 999999))
+        session['signup_otp'] = signup_otp
         session['signup_email'] = email
-        session['signup_password'] = password
         session['signup_name'] = name
+        session['signup_password'] = password
         
-        # Send via our completely custom Gmail logic
-        send_otp_email(email, otp, "Account Registration")
+        # Send OTP via email
+        send_otp_email(email, signup_otp, "Registration")
         
-        return redirect(f"/verify-otp?email={email}")
+        return redirect("/verify-otp")
 
     return render_template("register.html")
 
@@ -198,34 +207,29 @@ def register():
 def login():
     if request.method == "POST":
         email = normalize_email(request.form.get("email"))
-        password = request.form.get("password") or ""
         otp = request.form.get("otp")
         
-        # Step 1: If only email provided, generate and send OTP
-        if email and not otp and not password:
+        # Step 1: If only email provided (or password provided but we want OTP), generate and send OTP
+        if email and not otp:
+            # Check if user exists first to provide better error message
             try:
-                # Check if user exists in Supabase
-                res = supabase.auth.sign_in_with_password({
-                    "email": email,
-                    "password": "temp_check_" + str(random.randint(10000, 99999))
-                })
-            except Exception as e:
-                # Expected to fail, just checking if user exists
-                if "Invalid login credentials" not in str(e):
-                    return render_template("login.html", error="User not found. Please register first.")
-            
+                res = supabase.table('users').select('id').eq('email', email).execute()
+                if not res.data or len(res.data) == 0:
+                    return render_template("login.html", error="Account not found. Please register first.")
+            except Exception:
+                pass
+
             # Generate 6-digit OTP
             login_otp = str(random.randint(100000, 999999))
             session['login_otp'] = login_otp
             session['login_email'] = email
-            session['login_password'] = password
             
             # Send OTP via email
             send_otp_email(email, login_otp, "Login")
             
-            return redirect(f"/verify-login-otp?email={email}")
+            return render_template("verify_login_otp.html", email=email)
         
-        # Step 2: Verify OTP and login
+        # Step 2: Verify OTP and login (this path is also handled by verify_login_otp route if redirected, but keeping it unified)
         if email and otp:
             expected_otp = session.get('login_otp')
             expected_email = session.get('login_email')
@@ -244,83 +248,54 @@ def login():
                         # Clear OTP session
                         session.pop('login_otp', None)
                         session.pop('login_email', None)
-                        session.pop('login_password', None)
                         
+                        flash("Login successful!", "success")
                         return redirect("/dashboard")
                     else:
-                        return render_template("verify_login_otp.html", email=email, error="User not found.")
+                        return render_template("login.html", error="User data not found.")
                 except Exception as e:
-                    return render_template("verify_login_otp.html", email=email, error=f"Login failed: {str(e)}")
+                    return render_template("login.html", error=f"Login failed: {str(e)}")
             else:
                 return render_template("verify_login_otp.html", email=email, error="Invalid 6-digit OTP code.")
 
     return render_template("login.html")
 
-# VERIFY LOGIN OTP
-@app.route('/verify-login-otp', methods=['GET', 'POST'])
-def verify_login_otp():
-    if request.method == 'POST':
-        email = request.form.get('email') or ""
-        otp = request.form.get('otp')
-        
-        expected_otp = session.get('login_otp')
-        expected_email = session.get('login_email')
-        
-        if str(otp) == str(expected_otp) and email == expected_email:
-            try:
-                # Get user from Supabase by email
-                res = supabase.table('users').select('*').eq('email', email).execute()
-                if res.data and len(res.data) > 0:
-                    user_data = res.data[0]
-                    session["user_id"] = user_data.get('id')
-                    session["user_name"] = user_data.get('name', 'User')
-                    session["user_email"] = email
-                    session["is_admin"] = False
-                    
-                    # Clear OTP session
-                    session.pop('login_otp', None)
-                    session.pop('login_email', None)
-                    
-                    flash("Login successful!", "success")
-                    return redirect("/dashboard")
-                else:
-                    return render_template("verify_login_otp.html", email=email, error="User not found.")
-            except Exception as e:
-                return render_template("verify_login_otp.html", email=email, error=f"Login failed: {str(e)}")
-        else:
-            return render_template("verify_login_otp.html", email=email, error="Invalid 6-digit OTP code.")
-    
-    email = request.args.get('email', '')
-    return render_template("verify_login_otp.html", email=email)
-
-# VERIFY OTP
+# VERIFY REGISTRATION OTP
 @app.route('/verify-otp', methods=['GET', 'POST'])
 def verify_otp():
     if request.method == 'POST':
-        email = request.form.get('email') or ""
         otp = request.form.get('otp')
+        email = session.get('signup_email')
         
         expected_otp = session.get('signup_otp')
-        expected_email = session.get('signup_email')
         
-        if str(otp) == str(expected_otp) and email == expected_email:
+        if str(otp) == str(expected_otp):
             try:
                 signup_password = str(session.get('signup_password') or "")
                 signup_name = str(session.get('signup_name') or "")
+                
+                # Create user in Supabase Auth
                 supabase.auth.sign_up({
                     "email": email,
                     "password": signup_password,
                     "options": {"data": {"name": signup_name}}
                 })
+                
+                # Clear session
                 session.pop('signup_otp', None)
+                session.pop('signup_email', None)
+                session.pop('signup_name', None)
+                session.pop('signup_password', None)
+                
                 flash("Account verified and created successfully! Please log in.", "success")
                 return redirect("/login")
             except Exception as e:
-                return render_template("verify_otp.html", error=f"Verified OTP but Supabase failed: {str(e)}")
+                return render_template("verify_otp.html", error=f"Verification failed: {str(e)}")
         else:
             return render_template("verify_otp.html", error="Invalid 6-digit OTP code.")
 
     return render_template("verify_otp.html")
+
 
 # FORGOT PASSWORD
 @app.route('/forgot-password', methods=['GET', 'POST'])

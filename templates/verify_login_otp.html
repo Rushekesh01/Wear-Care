@@ -1,57 +1,49 @@
 {% extends 'base.html' %}
 
-{% block title %}Verify Login OTP — Wear & Care{% endblock %}
+{% block title %}Verify Login — Donation Platform{% endblock %}
 
 {% block content %}
 <section class="wc-section pt-0">
   <div class="row justify-content-center">
     <div class="col-md-8 col-lg-5">
       <div class="text-center mb-4">
-        <h1 class="h2 fw-bold wc-title mb-2">Verify Login</h1>
-        <p class="wc-lead mb-0">Enter the 6-digit OTP sent to your email.</p>
+        <h1 class="h2 fw-bold wc-title mb-2">Login Verification</h1>
+        <p class="wc-lead mb-0">We have sent a 6-digit code to {{ email }}.</p>
       </div>
 
       <div class="wc-card">
         <div class="wc-card-body">
-          <form method="POST" action="/verify-login-otp" novalidate>
+          <form method="POST" action="/login" novalidate>
             {% if error %}
               <div class="alert alert-danger mb-3" role="alert">{{ error }}</div>
             {% endif %}
             
-            <div class="mb-3">
-              <label class="form-label" for="email">Email address</label>
-              <input 
-                class="form-control" 
-                id="email" 
-                type="email" 
-                name="email" 
-                value="{{ email }}"
-                readonly
-              >
-            </div>
+            <input type="hidden" name="email" value="{{ email }}">
 
-            <div class="mb-3">
-              <label class="form-label" for="otp">6-Digit OTP</label>
+            <div class="mb-4">
+              <label class="form-label" for="otp">Enter 6-Digit Code</label>
               <input 
-                class="form-control" 
+                class="form-control text-center fs-4 letter-spacing-2" 
                 id="otp" 
                 type="text" 
                 name="otp" 
-                placeholder="Enter 6-digit code"
+                placeholder="000000"
                 maxlength="6"
-                pattern="[0-9]{6}"
                 inputmode="numeric"
                 autocomplete="one-time-code"
                 required
                 autofocus
               >
+              <div class="form-text text-center mt-2 wc-muted">
+                This securely logs you into your account.
+              </div>
             </div>
 
             <button class="btn btn-wc-primary w-100" type="submit">Verify & Login</button>
 
             <div class="text-center mt-4">
               <div class="small wc-muted">
-                Didn't receive OTP? <a href="/login" class="link-light">Try again</a>
+                Didn't receive a code? <a href="/login" class="link-light">Try again</a>
               </div>
             </div>
           </form>

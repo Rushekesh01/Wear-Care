@@ -1,6 +1,6 @@
 {% extends 'base.html' %}
 
-{% block title %}Login — Wear & Care{% endblock %}
+{% block title %}Login — Donation Platform{% endblock %}
 
 {% block content %}
 <section class="wc-section pt-0">
@@ -8,7 +8,7 @@
     <div class="col-md-8 col-lg-5">
       <div class="text-center mb-4">
         <h1 class="h2 fw-bold wc-title mb-2">Welcome back</h1>
-        <p class="wc-lead mb-0">Enter your email to receive a 6-digit OTP for login.</p>
+        <p class="wc-lead mb-0">Enter your credentials to access your account.</p>
       </div>
 
       <div class="wc-card">
@@ -35,7 +35,7 @@
                 name="email" 
                 placeholder="your@email.com"
                 value="{{ request.form.get('email', '') }}"
-                autocomplete="off"
+                autocomplete="username"
                 required
                 autofocus
               >
@@ -48,6 +48,8 @@
                 Don't have an account? <a href="/register" class="link-light">Create one</a>
               </div>
             </div>
+
+
           </form>
         </div>
       </div>
@@ -61,12 +63,4 @@
 {% endblock %}
 
 {% block scripts %}
-<script>
-  document.addEventListener('DOMContentLoaded', function() {
-    // Prevent browser autofill
-    setTimeout(function() {
-      document.getElementById('email').value = '';
-    }, 100);
-  });
-</script>
 {% endblock %}

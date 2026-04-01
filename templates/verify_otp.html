@@ -1,14 +1,14 @@
 {% extends 'base.html' %}
 
-{% block title %}Verify Email — Wear & Care{% endblock %}
+{% block title %}Verify Registration — Donation Platform{% endblock %}
 
 {% block content %}
 <section class="wc-section pt-0">
   <div class="row justify-content-center">
     <div class="col-md-8 col-lg-5">
       <div class="text-center mb-4">
-        <h1 class="h2 fw-bold wc-title mb-2">Verify your email</h1>
-        <p class="wc-lead mb-0">We sent a 6-digit OTP to your email. Please enter it below to confirm your account.</p>
+        <h1 class="h2 fw-bold wc-title mb-2">Verify your account</h1>
+        <p class="wc-lead mb-0">We have sent a 6-digit code to your email.</p>
       </div>
 
       <div class="wc-card">
@@ -18,9 +18,9 @@
               <div class="alert alert-danger mb-3" role="alert">{{ error }}</div>
             {% endif %}
             
-            <input type="hidden" name="email" value="{{ request.args.get('email', '') }}">
+            <input type="hidden" name="email" value="{{ session.get('signup_email', '') }}">
 
-            <div class="mb-3">
+            <div class="mb-4">
               <label class="form-label" for="otp">6-Digit Code</label>
               <input 
                 class="form-control text-center fs-4 letter-spacing-2" 
@@ -29,13 +29,23 @@
                 name="otp" 
                 placeholder="000000"
                 maxlength="6"
-                autocomplete="off"
+                inputmode="numeric"
+                autocomplete="one-time-code"
                 required
                 autofocus
               >
+              <div class="form-text text-center mt-2 wc-muted">
+                Entering the code will complete your registration.
+              </div>
             </div>
 
-            <button class="btn btn-wc-primary w-100" type="submit">Verify & Login</button>
+            <button class="btn btn-wc-primary w-100" type="submit">Complete Registration</button>
+
+            <div class="text-center mt-4">
+              <div class="small wc-muted">
+                Didn't receive a code? <a href="/register" class="link-light">Try again</a>
+              </div>
+            </div>
           </form>
         </div>
       </div>
