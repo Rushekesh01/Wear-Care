@@ -209,7 +209,7 @@ def login():
         email = normalize_email(request.form.get("email"))
         otp = request.form.get("otp")
         
-        # New Case: Password-based login (specifically for post-OTP registration flow)
+        # User Login: Email and Password Only
         password = request.form.get("password")
         if email and password:
             try:
@@ -219,7 +219,7 @@ def login():
                     "password": password
                 })
                 
-                # If successful, get user data from public.users
+                # If successful, get user data from public.users to populate session
                 res = supabase.table('users').select('*').eq('email', email).execute()
                 if res.data and len(res.data) > 0:
                     user_data = res.data[0]
@@ -231,58 +231,17 @@ def login():
                     flash("Login successful!", "success")
                     return redirect("/dashboard")
                 else:
-                    return render_template("login.html", error="User data not found.")
+                    return render_template("login.html", error="User account found on auth but missing details.")
             except Exception as e:
-                return render_template("login.html", email=email, error=f"Login failed: {str(e)}")
-
-        # Step 1: If only email provided, generate and send OTP
-        if email and not otp and not password:
-            # Check if user exists first to provide better error message
-            try:
-                res = supabase.table('users').select('id').eq('email', email).execute()
-                if not res.data or len(res.data) == 0:
-                    return render_template("login.html", error="Account not found. Please register first.")
-            except Exception:
-                pass
-
-            # Generate 6-digit OTP
-            login_otp = str(random.randint(100000, 999999))
-            session['login_otp'] = login_otp
-            session['login_email'] = email
-            
-            # Send OTP via email
-            send_otp_email(email, login_otp, "Login")
-            
-            return render_template("verify_login_otp.html", email=email)
+                # Provide a generic error message for invalid credentials
+                error_msg = str(e)
+                if "Invalid login credentials" in error_msg:
+                    return render_template("login.html", email=email, error="Invalid email or password.")
+                return render_template("login.html", email=email, error=f"Login failed: {error_msg}")
         
-        # Step 2: Verify OTP and login (this path is also handled by verify_login_otp route if redirected, but keeping it unified)
-        if email and otp:
-            expected_otp = session.get('login_otp')
-            expected_email = session.get('login_email')
-            
-            if str(otp) == str(expected_otp) and email == expected_email:
-                try:
-                    # Get user from Supabase by email
-                    res = supabase.table('users').select('*').eq('email', email).execute()
-                    if res.data and len(res.data) > 0:
-                        user_data = res.data[0]
-                        session["user_id"] = user_data.get('id')
-                        session["user_name"] = user_data.get('name', 'User')
-                        session["user_email"] = email
-                        session["is_admin"] = False
-                        
-                        # Clear OTP session
-                        session.pop('login_otp', None)
-                        session.pop('login_email', None)
-                        
-                        flash("Login successful!", "success")
-                        return redirect("/dashboard")
-                    else:
-                        return render_template("login.html", error="User data not found.")
-                except Exception as e:
-                    return render_template("login.html", error=f"Login failed: {str(e)}")
-            else:
-                return render_template("verify_login_otp.html", email=email, error="Invalid 6-digit OTP code.")
+        # If no password provided, ask for it
+        if email and not password:
+            return render_template("login.html", email=email, error="Please enter your password.")
 
     return render_template("login.html")
 
