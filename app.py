@@ -259,56 +259,26 @@ def verify_otp():
                 signup_password = str(session.get('signup_password') or "")
                 signup_name = str(session.get('signup_name') or "")
                 
-                # Create and confirm user in Supabase Auth
+                # Create user in Supabase Auth
                 signup_res = supabase.auth.sign_up({
                     "email": email,
                     "password": signup_password,
                     "options": {"data": {"name": signup_name}}
                 })
                 
-                # Check if signup was successful
-                if signup_res.user:
-                    # Log the user in immediately to establish a confirmed session
-                    # This bypasses the need for immediate password re-entry on redirects
-                    try:
-                        login_res = supabase.auth.sign_in_with_password({
-                            "email": email,
-                            "password": signup_password
-                        })
-                        
-                        # Get user from public users table to set session variables
-                        user_res = supabase.table('users').select('*').eq('email', email).execute()
-                        if user_res.data and len(user_res.data) > 0:
-                            user_data = user_res.data[0]
-                            session["user_id"] = user_data.get('id')
-                            session["user_name"] = user_data.get('name', 'User')
-                        if user_res.data and len(user_res.data) > 0:
-                            user_data = user_res.data[0]
-                            session["user_id"] = user_data.get('id')
-                            session["user_name"] = user_data.get('name', 'User')
-                            session["user_email"] = email
-                            session["is_admin"] = False
-                            
-                            # Clear signup session data
-                            session.pop('signup_otp', None)
-                            session.pop('signup_email', None)
-                            session.pop('signup_name', None)
-                            session.pop('signup_password', None)
-                            
-                            flash("Registration complete! Welcome to the Donation Platform.", "success")
-                            return redirect("/dashboard")
-                        else:
-                            # If for some reason the internal table is out of sync
-                            flash("Account verified! Please log in to your dashboard.", "success")
-                            return redirect(url_for('login', email=email))
-                    except Exception as e:
-                        print(f"Auto-login failed: {e}")
-                        # Fallback: Still tell them they are verified
-                        flash("Account verified successfully! Please log in.", "success")
-                        return redirect(url_for('login', email=email))
-
-                # Primary fallback
-                flash("Account verified successfully! Please log in.", "success")
+                # Force confirm the email in the backend using our RPC function
+                try:
+                    supabase.rpc('confirm_user_email', {'user_email': email}).execute()
+                except Exception as e:
+                    print(f"RPC confirmation failed: {e}")
+                
+                # Clear signup session data
+                session.pop('signup_otp', None)
+                session.pop('signup_email', None)
+                session.pop('signup_name', None)
+                session.pop('signup_password', None)
+                
+                flash("Account verified successfully! Please log in with your password.", "success")
                 return redirect(url_for('login', email=email))
             except Exception as e:
                 return render_template("verify_otp.html", error=f"Verification failed: {str(e)}")
