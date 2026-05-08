@@ -235,6 +235,28 @@ label {
   color: white !important;
 }
 
+.btn-reject:disabled,
+.btn-reject[disabled] {
+  background: #ccc !important;
+  color: #666 !important;
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+.btn-approve:disabled,
+.btn-approve[disabled] {
+  background: #ccc !important;
+  color: #666 !important;
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+.btn:disabled,
+.btn[disabled] {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
 /* Cards */
 .wc-card {
   background: var(--bg-primary);
@@ -343,39 +365,83 @@ label {
 }
 
 .table-dark {
-  background-color: var(--bg-primary);
-  color: var(--text-primary);
+  background-color: #FFFFFF !important;
+  color: var(--text-primary) !important;
 }
 
 .table-dark td,
 .table-dark th {
-  color: var(--text-primary) !important;
-  border-color: var(--border);
+  color: #2C3E50 !important;
+  border-color: var(--border) !important;
+  background-color: #FFFFFF !important;
+}
+
+.table-dark tbody td {
+  background-color: #FFFFFF !important;
+  color: #2C3E50 !important;
 }
 
 .table-dark thead th {
-  background-color: var(--bg-secondary);
-  color: var(--text-primary);
+  background-color: var(--bg-secondary) !important;
+  color: var(--text-primary) !important;
+  border-color: var(--border) !important;
+}
+
+.table-dark tbody tr {
+  background-color: #FFFFFF !important;
+}
+
+.table-dark tbody tr td {
+  background-color: #FFFFFF !important;
+  color: #2C3E50 !important;
 }
 
 .table-dark tbody tr:hover {
-  background-color: var(--bg-tertiary);
+  background-color: var(--bg-tertiary) !important;
 }
 
-.table-dark tbody tr:nth-of-type(odd) {
-  background-color: transparent;
+.table-dark tbody tr:hover td {
+  background-color: var(--bg-tertiary) !important;
+  color: #2C3E50 !important;
 }
 
-.table-dark tbody tr:nth-of-type(even) {
-  background-color: rgba(13, 127, 127, 0.02);
+.table-dark .wc-muted {
+  color: #7F8C8D !important;
 }
 
-.table-dark.table-striped tbody tr:nth-of-type(odd) {
-  background-color: transparent;
+.table-dark .wc-muted a {
+  color: #0D7F7F !important;
+  text-decoration: none;
 }
 
-.table-dark.table-striped tbody tr:nth-of-type(even) {
-  background-color: rgba(13, 127, 127, 0.03);
+.table-striped > tbody > tr > td {
+  background-color: #FFFFFF !important;
+  color: #2C3E50 !important;
+}
+
+.table-striped > tbody > tr:nth-child(odd) > td {
+  background-color: #FFFFFF !important;
+  color: #2C3E50 !important;
+}
+
+.table-striped > tbody > tr:nth-child(even) > td {
+  background-color: #FFFFFF !important;
+  color: #2C3E50 !important;
+}
+
+.table-dark.table-striped > tbody > tr > td {
+  background-color: #FFFFFF !important;
+  color: #2C3E50 !important;
+}
+
+.table-dark.table-striped > tbody > tr:nth-child(odd) > td {
+  background-color: #FFFFFF !important;
+  color: #2C3E50 !important;
+}
+
+.table-dark.table-striped > tbody > tr:nth-child(even) > td {
+  background-color: #FFFFFF !important;
+  color: #2C3E50 !important;
 }
 
 .table-danger {
@@ -596,4 +662,49 @@ label {
   color: var(--primary) !important;
   border-bottom-color: var(--primary);
   background-color: transparent;
+}
+
+/* CRITICAL: Override all Bootstrap table-dark/table-striped colors */
+.table-dark.table-striped tbody tr,
+.table-dark tbody tr,
+table.table-dark.table-striped tbody tr,
+table.table-dark tbody tr {
+  background-color: #FFFFFF !important;
+  color: #2C3E50 !important;
+}
+
+.table-dark.table-striped tbody tr td,
+.table-dark tbody tr td,
+table.table-dark.table-striped tbody tr td,
+table.table-dark tbody tr td,
+.table-dark.table-striped > tbody > tr > td,
+.table-dark > tbody > tr > td {
+  background-color: #FFFFFF !important;
+  color: #2C3E50 !important;
+}
+
+.table-dark.table-striped tbody tr:nth-child(1) td,
+.table-dark tbody tr:nth-child(1) td,
+.table-dark.table-striped tbody tr:first-child td,
+.table-dark tbody tr:first-child td {
+  background-color: #FFFFFF !important;
+  color: #2C3E50 !important;
+}
+
+.table-dark.table-striped tbody tr:nth-child(2) td,
+.table-dark tbody tr:nth-child(2) td {
+  background-color: #FFFFFF !important;
+  color: #2C3E50 !important;
+}
+
+/* Override fw-semibold text in tables */
+.table-dark .fw-semibold,
+.table-dark tbody .fw-semibold {
+  color: #2C3E50 !important;
+}
+
+/* Override .small text in tables */
+.table-dark .small,
+.table-dark tbody .small {
+  color: #7F8C8D !important;
 }

@@ -30,9 +30,9 @@
                 <input class="form-control" id="email" name="email" type="email" value="{{ user[2] }}" required>
               </div>
               <div class="col-12">
-                <label class="form-label" for="password">New password (optional)</label>
-                <input class="form-control" id="password" name="password" type="password" placeholder="Leave blank to keep existing">
-                <div class="form-text text-secondary">If you enter a password here, it will overwrite the current password.</div>
+                <div class="alert alert-info mb-0" role="alert">
+                  Password updates are not supported here. To change the password, use the Supabase auth dashboard or a dedicated password-reset flow.
+                </div>
               </div>
               <div class="col-12">
                 <button class="btn btn-wc-accent w-100" type="submit">Save changes</button>

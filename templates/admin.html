@@ -138,8 +138,12 @@
                   </td>
                   <td class="text-end">
                     <div class="d-flex justify-content-end gap-1 flex-wrap">
-                      <a href="/approve/{{ d[0] }}" class="btn btn-sm btn-approve" title="Approve this donation">Approve</a>
-                      <a href="/reject/{{ d[0] }}" class="btn btn-sm btn-reject" title="Reject this donation">Reject</a>
+                      <form method="POST" action="/admin/donations/{{ d[0] }}/approve" style="display:inline;">
+                        <button type="submit" class="btn btn-sm btn-approve" title="Approve this donation" onclick="return confirm('Approve this donation?')">Approve</button>
+                      </form>
+                      <form method="POST" action="/admin/donations/{{ d[0] }}/reject" style="display:inline;">
+                        <button type="submit" class="btn btn-sm btn-reject" title="Reject this donation" onclick="return confirm('Reject this donation?')">Reject</button>
+                      </form>
                       <a href="/admin/donations/{{ d[0] }}/edit" class="btn btn-sm btn-wc-primary" title="Edit donation details">Edit</a>
                       <form method="POST" action="/admin/donations/{{ d[0] }}/delete" style="display:inline;">
                         <button type="submit" class="btn btn-sm btn-danger" title="Delete this donation permanently"
