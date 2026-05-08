@@ -24,7 +24,7 @@
               {% for img in images %}
                 <div style="background-color: rgba(0,0,0,0.25); border-radius: var(--wc-radius); display: flex; align-items: center; justify-content: center;">
                   <img class="img-fluid w-100" style="border-radius: var(--wc-radius); aspect-ratio: 4/3; object-fit: contain; padding: 0.25rem;"
-                       src="{{ url_for('static', filename='uploads/' + img) }}"
+                       src="{{ get_image_url(img) }}"
                        alt="Donation photo {{ loop.index }}">
                 </div>
               {% endfor %}

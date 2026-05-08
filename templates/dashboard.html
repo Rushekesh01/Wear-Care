@@ -190,7 +190,7 @@
           <div style="background-color: #F8F9FA; position: relative; border-bottom: 1px solid rgba(0,0,0,0.1);">
             {% set images_list = d[6].split(',') if d|length > 6 and d[6] else [] %}
             {% if images_list|length > 0 %}
-              <img src="{{ url_for('static', filename='uploads/' + images_list[0]) }}" alt="Donated Item" class="w-100" style="aspect-ratio: 1/1; object-fit: contain; padding: 0.5rem; transition: transform 0.4s ease;">
+              <img src="{{ get_image_url(images_list[0]) }}" alt="Donated Item" class="w-100" style="aspect-ratio: 1/1; object-fit: contain; padding: 0.5rem; transition: transform 0.4s ease;">
             {% else %}
               <div class="d-flex align-items-center justify-content-center w-100" style="aspect-ratio: 1/1;">
                 <span style="color: #7F8C8D;">No Image Available</span>

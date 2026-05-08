@@ -143,7 +143,7 @@
             {% if image %}
               <div style="background: linear-gradient(135deg, var(--bg-secondary), var(--bg-tertiary)); overflow: hidden; height: 220px; display: flex; align-items: center; justify-content: center;">
                 <img class="img-fluid w-100 h-100" style="object-fit: cover;"
-                     src="{{ url_for('static', filename='uploads/' + image) }}"
+                     src="{{ get_image_url(image) }}"
                      alt="Item photo">
               </div>
             {% else %}
@@ -197,7 +197,7 @@
               <!-- Actions -->
               <div class="d-flex gap-2 flex-wrap">
                 {% if image %}
-                  <a class="btn btn-sm btn-wc-ghost" href="{{ url_for('static', filename='uploads/' + image) }}" target="_blank" rel="noopener">View</a>
+                  <a class="btn btn-sm btn-wc-ghost" href="{{ get_image_url(image) }}" target="_blank" rel="noopener">View</a>
                 {% endif %}
                 
                 {% set can_request = (status != 'Rejected') %}

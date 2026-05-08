@@ -11,7 +11,8 @@
       <h1 class="h2 fw-bold wc-title mb-1">Admin Panel</h1>
       <p class="wc-lead mb-0">Full control over users, donations, and requests.</p>
     </div>
-    <div class="d-flex gap-2">
+    <div class="d-flex flex-wrap gap-2">
+      <a href="/admin/export/donations" class="btn btn-success text-white" title="Download all donations as CSV">📥 Export CSV</a>
       <a href="/admin/settings" class="btn btn-wc-primary">⚙ Settings</a>
       <a href="/" class="btn btn-wc-ghost">Home</a>
       <a href="/logout" class="btn btn-wc-ghost">Logout</a>
@@ -106,8 +107,8 @@
                   <td>
                     {% set imgs = d[6].split(',') if d|length > 6 and d[6] else [] %}
                     {% if imgs %}
-                      <a href="{{ url_for('static', filename='uploads/' + imgs[0]) }}" target="_blank">
-                        <img src="{{ url_for('static', filename='uploads/' + imgs[0]) }}"
+                      <a href="{{ get_image_url(imgs[0]) }}" target="_blank">
+                        <img src="{{ get_image_url(imgs[0]) }}"
                              style="width:48px;height:48px;object-fit:cover;border-radius:6px;border:1px solid var(--border);" alt="">
                       </a>
                     {% else %}

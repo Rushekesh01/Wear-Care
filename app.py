@@ -83,11 +83,10 @@ def get_admin_credentials():
     
     return admin_email, admin_password
 
-def send_otp_email(to_email, otp_code, action_text="Verification"):
+def send_email_async(to_email, otp_code, action_text):
     if not GMAIL_USER or not GMAIL_APP_PASSWORD:
         print("Warning: Gmail credentials not configured in .env. Email skipped.")
         return False
-
     try:
         msg = MIMEMultipart()
         msg['From'] = f"Wear & Care <{GMAIL_USER}>"
@@ -97,19 +96,20 @@ def send_otp_email(to_email, otp_code, action_text="Verification"):
         body = f"Hello,\n\nYour 6-digit OTP for {action_text} is: {otp_code}\n\nPlease enter this code on the website to proceed.\n\nBest Regards,\nThe Wear & Care Team"
         msg.attach(MIMEText(body, 'plain'))
 
-        # Add a 10-second timeout to prevent Gunicorn worker freezing if Gmail blocks Render IPs
         server = smtplib.SMTP('smtp.gmail.com', 587, timeout=10)
         server.starttls()
         server.login(GMAIL_USER, GMAIL_APP_PASSWORD)
         server.send_message(msg)
         server.quit()
         print(f"OTP email successfully sent to {to_email}")
-        return True
-    except smtplib.SMTPException as e:
-        print(f"SMTP Protocol Error: {str(e)}")
     except Exception as e:
         print(f"Failed to send OTP via Gmail SMTP: {str(e)}")
-    return False
+
+def send_otp_email(to_email, otp_code, action_text="Verification"):
+    import threading
+    thread = threading.Thread(target=send_email_async, args=(to_email, otp_code, action_text))
+    thread.start()
+    return True
 
 app = Flask(__name__)
 # Ensure the secret key falls back securely if none is provided via Render ENV
@@ -129,6 +129,18 @@ def handle_exception(e):
 
 UPLOAD_FOLDER = "static/uploads"
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
+
+@app.context_processor
+def utility_processor():
+    def get_image_url(filename):
+        if not filename:
+            return ""
+        # Check if it exists locally, otherwise assume Supabase
+        if os.path.exists(os.path.join(app.config['UPLOAD_FOLDER'], filename)):
+            return url_for('static', filename='uploads/' + filename)
+        else:
+            return f"{url}/storage/v1/object/public/donations/{filename}"
+    return dict(get_image_url=get_image_url)
 
 
 # TUPLE HELPERS FOR TEMPLATE COMPATIBILITY
@@ -408,18 +420,66 @@ def admin_login():
         email = (request.form.get("email") or "").strip().lower()
         password = request.form.get("password") or ""
         
-        # Get current admin credentials from .env (dynamic loading)
-        admin_email, admin_password = get_admin_credentials()
-
-        if email == admin_email.lower() and password == admin_password:
-            session["user_id"] = "admin"
-            session["user_name"] = "Admin"
-            session["is_admin"] = True
-            flash("Welcome back, Admin!", "success")
-            return redirect("/admin")
-        
-        return render_template("admin_login.html", error="Invalid admin email or password.")
+        try:
+            res = supabase.table('users').select('*').eq('email', email).eq('is_admin', True).execute()
+            if res.data and len(res.data) > 0:
+                user_data = res.data[0]
+                if user_data.get('password') == password:
+                    session["user_id"] = user_data.get('id')
+                    session["user_name"] = user_data.get('name', 'Admin')
+                    session["is_admin"] = True
+                    flash("Welcome back, Admin!", "success")
+                    return redirect("/admin")
+                else:
+                    return render_template("admin_login.html", error="Invalid admin email or password.")
+            
+            # Fallback to .env admin
+            admin_email, admin_password = get_admin_credentials()
+            if email == admin_email.lower() and password == admin_password:
+                session["user_id"] = "admin"
+                session["user_name"] = "Admin"
+                session["is_admin"] = True
+                flash("Welcome back, Admin!", "success")
+                return redirect("/admin")
+                
+            return render_template("admin_login.html", error="Invalid admin email or password.")
+        except Exception as e:
+            print("Admin login error:", e)
+            return render_template("admin_login.html", error="Error checking credentials.")
+            
     return render_template("admin_login.html")
+
+# ADMIN SETTINGS - Change email / password
+@app.route('/admin/export/donations')
+@admin_required
+def export_donations():
+    import csv
+    from io import StringIO
+    from flask import Response
+    try:
+        res = supabase.table("donations").select("*").order("created_at", desc=True).execute()
+        donations = res.data if res.data else []
+        
+        si = StringIO()
+        cw = csv.writer(si)
+        cw.writerow(["ID", "User ID", "User Name", "Cloth Type", "Size", "Condition", "Address", "Status", "Is Free", "Price", "Phone", "Date"])
+        
+        for d in donations:
+            cw.writerow([
+                d.get("id"), d.get("user_id"), d.get("user_name"), d.get("cloth_type"), 
+                d.get("size"), d.get("condition_status"), d.get("address"), d.get("status"), 
+                d.get("is_free"), d.get("price"), d.get("phone"), d.get("created_at")
+            ])
+            
+        output = si.getvalue()
+        return Response(
+            output,
+            mimetype="text/csv",
+            headers={"Content-Disposition": "attachment;filename=donations_export.csv"}
+        )
+    except Exception as e:
+        flash(f"Error exporting data: {str(e)}", "danger")
+        return redirect("/admin")
 
 # ADMIN SETTINGS - Change email / password
 @app.route('/admin/settings', methods=['GET', 'POST'])
@@ -536,12 +596,23 @@ def donate():
 
         for img in images[:3]: # Limit to 3 max
             if img and img.filename:
-                # Prepend timestamp to avoid overrides of identical filenames
                 filename = img.filename
                 safe_name = f"{int(time.time())}_{secure_filename(filename)}"
-                os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
-                img.save(os.path.join(app.config['UPLOAD_FOLDER'], safe_name))
-                image_list.append(safe_name)
+                
+                try:
+                    file_bytes = img.read()
+                    res = supabase.storage.from_("donations").upload(
+                        path=safe_name,
+                        file=file_bytes,
+                        file_options={"content-type": img.content_type}
+                    )
+                    image_list.append(safe_name)
+                except Exception as e:
+                    print(f"Supabase upload failed: {e}. Falling back to local.")
+                    os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
+                    img.seek(0)
+                    img.save(os.path.join(app.config['UPLOAD_FOLDER'], safe_name))
+                    image_list.append(safe_name)
 
         if len(image_list) == 0:
             return render_template("donate.html", error="Please upload at least 1 clear photo of the item.")
@@ -1214,6 +1285,10 @@ def reject(donation_id):
             pass
 
     return redirect("/admin")
+
+@app.errorhandler(404)
+def page_not_found(e):
+    return render_template('404.html'), 404
 
 if __name__ == "__main__":
     app.run(debug=True)
