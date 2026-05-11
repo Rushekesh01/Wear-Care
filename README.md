@@ -49,13 +49,21 @@ The platform features secure user authentication via email OTPs, image uploads, 
 ### 📅 Project Timeline
 | Date | Work / Milestone |
 |------|------------------|
-| **15 Feb 2026** | Semester project start |
-| **22 Feb 2026** | Project topic finalization |
-| **28 Feb 2026** | Project Interaction with Guide (Abstract) |
-| **3 Mar 2026** | Implementation Progress - 1 (Front-end 1st/2nd page, Admin login page) |
-| **9 Mar 2026** | Monitoring - 1 |
-| **18 Mar 2026** | Implementation progress - 2 (Invitation) |
-| **May 2026** | Final Polish, Backend Integration & Cloud Deployment |
+| 15 Feb 2026 | Semester project start |
+| 22 Feb 2026 | Project topic finalization |
+| 28 Feb 2026 | Project Interaction with Guide (Abstract) |
+| 3 Mar 2026 | Implementation Progress - 1 (Front-end 1st/2nd page, Admin login page) |
+| 9 Mar 2026 | Monitoring - 1 |
+| 18 Mar 2026 | Implementation progress - 2 (Invitation) |
+| 12 april 2026 | Final Polish, Backend Integration & Cloud Deployment |
+| 27 april 2026 | backend development using python and MYSQL |
+| 2 May 2026 | Admin module development |
+| 10 May 2026 | Testing and debugging |
+| 15 May Documentation and report preparation|
+
+
+
+
 
 ---
 
