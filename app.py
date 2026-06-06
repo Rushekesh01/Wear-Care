@@ -7,7 +7,7 @@ from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 from functools import wraps
 
-from flask import Flask, render_template, request, redirect, session, flash # type: ignore
+from flask import Flask, render_template, request, redirect, session, flash, url_for # type: ignore
 from werkzeug.utils import secure_filename # type: ignore
 from dotenv import load_dotenv # type: ignore
 
@@ -84,12 +84,23 @@ def get_admin_credentials():
     return admin_email, admin_password
 
 def send_email_async(to_email, otp_code, action_text):
-    if not GMAIL_USER or not GMAIL_APP_PASSWORD:
+    print(f"\n[{action_text} OTP] ---> {otp_code} <--- (Sent to: {to_email})\n")
+    
+    # Dynamically load from .env to avoid caching issues
+    import os
+    from dotenv import load_dotenv
+    env_path = os.path.join(os.path.dirname(__file__), '.env')
+    load_dotenv(env_path, override=True)
+    
+    current_gmail_user = os.environ.get("GMAIL_SMTP_USER", "").strip()
+    current_gmail_pass = os.environ.get("GMAIL_SMTP_PASSWORD", "").strip()
+    
+    if not current_gmail_user or not current_gmail_pass:
         print("Warning: Gmail credentials not configured in .env. Email skipped.")
         return False
     try:
         msg = MIMEMultipart()
-        msg['From'] = f"Wear & Care <{GMAIL_USER}>"
+        msg['From'] = f"Wear & Care <{current_gmail_user}>"
         msg['To'] = to_email
         msg['Subject'] = f"{action_text} OTP - Wear & Care"
 
@@ -98,7 +109,7 @@ def send_email_async(to_email, otp_code, action_text):
 
         server = smtplib.SMTP('smtp.gmail.com', 587, timeout=10)
         server.starttls()
-        server.login(GMAIL_USER, GMAIL_APP_PASSWORD)
+        server.login(current_gmail_user, current_gmail_pass)
         server.send_message(msg)
         server.quit()
         print(f"OTP email successfully sent to {to_email}")
@@ -645,8 +656,12 @@ def donate():
 @app.route('/dashboard')
 @login_required
 def dashboard():
+    # Admins should use the admin panel, not the user dashboard
+    if session.get("is_admin"):
+        return redirect("/admin")
+
     user_id = session.get("user_id")
-    
+
     # Donations
     d_res = supabase.table("donations").select("*").eq("user_id", user_id).order('id', desc=True).execute()
     data = [dict_to_donation_tuple(d) for d in d_res.data]
@@ -805,12 +820,16 @@ def listings():
     items_per_page = 12
     
     try:
-        # Get all donations first (Supabase limitations)
-        if user_id and not session.get("is_admin"):
-            res = supabase.table("donations").select("*").neq("user_id", user_id).execute()
-        else:
+        # Admin sees all statuses; regular users/guests only see Approved listings
+        if session.get("is_admin"):
             res = supabase.table("donations").select("*").execute()
-        
+        elif user_id:
+            # Logged-in user: Approved only, excluding their own donations
+            res = supabase.table("donations").select("*").eq("status", "Approved").neq("user_id", user_id).execute()
+        else:
+            # Guest: Approved only
+            res = supabase.table("donations").select("*").eq("status", "Approved").execute()
+
         donations = res.data if res.data else []
         
         # Filter by search term (searching in cloth_type, condition, and donor name)
@@ -954,11 +973,13 @@ def admin_edit_user(user_id):
 @app.route('/admin/users/<user_id>/delete', methods=['POST'])
 @admin_required
 def admin_delete_user(user_id):
-    # Deleting from public.users will cascade or might need auth admin API
-    # Assuming public.users ON DELETE CASCADE is NOT on auth.users backwards.
-    # To truly delete a user, we should delete via auth endpoints or let public.user be deleted.
-    supabase.table("users").delete().eq("id", user_id).execute()
-    flash("User deleted.", "success")
+    try:
+        # Use RPC function (SECURITY DEFINER) to bypass RLS and cascade-delete
+        # the user's donations, notifications, purchase requests, then the user itself.
+        supabase.rpc("admin_delete_user", {"target_user_id": user_id}).execute()
+        flash("User and all their data deleted successfully.", "success")
+    except Exception as e:
+        flash(f"Failed to delete user: {str(e)}", "danger")
     return redirect("/admin")
 
 # ADMIN: FLAG USER as Suspicious

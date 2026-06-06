@@ -2,9 +2,7 @@
 
 {% block title %}Dashboard — Wear & Care{% endblock %}
 
-{% block head %}
-<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-{% endblock %}
+{% block head %}{% endblock %}
 
 {% block content %}
 <section class="wc-section pt-0">
@@ -164,15 +162,23 @@
       <div class="wc-card">
         <div class="wc-card-body">
           <div class="small wc-muted">Total donations</div>
-          <div class="h2 fw-bold mb-0" id="donationCount">{{ donations|length }}</div>
+          <div class="h2 fw-bold mb-0">{{ donations|length }}</div>
         </div>
       </div>
     </div>
-    <div class="col-md-8">
+    <div class="col-md-4">
       <div class="wc-card">
         <div class="wc-card-body">
-          <div class="small wc-muted mb-2">Donation statistics</div>
-          <canvas id="donationChart" height="90"></canvas>
+          <div class="small wc-muted">Approved</div>
+          <div class="h2 fw-bold mb-0" style="color: #27ae60;">{{ donations | selectattr(7, 'equalto', 'Approved') | list | length }}</div>
+        </div>
+      </div>
+    </div>
+    <div class="col-md-4">
+      <div class="wc-card">
+        <div class="wc-card-body">
+          <div class="small wc-muted">Pending</div>
+          <div class="h2 fw-bold mb-0" style="color: #f39c12;">{{ donations | selectattr(7, 'equalto', 'Pending') | list | length }}</div>
         </div>
       </div>
     </div>
@@ -256,41 +262,7 @@
 {% endblock %}
 
 {% block scripts %}
-{% if donations is not none and donations|length != 0 %}
-<script>
-  (function() {
-    var countEl = document.getElementById('donationCount');
-    var donationCount = countEl ? parseInt(countEl.textContent) : 0;
-    var ctx = document.getElementById('donationChart');
-    if (ctx) {
-      new Chart(ctx, {
-        type: 'bar',
-        data: {
-          labels: ['Total Donations'],
-          datasets: [{
-            label: 'Donations',
-            data: [donationCount],
-            backgroundColor: ['rgba(91, 140, 255, 0.85)'],
-            borderColor: ['rgba(255,255,255,0.15)'],
-            borderWidth: 1,
-            borderRadius: 10
-          }]
-        },
-        options: {
-          responsive: true,
-          plugins: {
-            legend: { labels: { color: 'rgba(234,240,255,0.85)' } }
-          },
-          scales: {
-            x: { ticks: { color: 'rgba(234,240,255,0.75)' }, grid: { color: 'rgba(255,255,255,0.08)' } },
-            y: { ticks: { color: 'rgba(234,240,255,0.75)' }, grid: { color: 'rgba(255,255,255,0.08)' }, beginAtZero: true }
-          }
-        }
-      });
-    }
-  })();
-</script>
-{% endif %}
+
 
 {% if popup_notification %}
 <script>

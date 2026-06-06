@@ -18,7 +18,9 @@
           <p class="lead mb-4" style="color: rgba(255,255,255,0.95); text-align: left; font-size: 1.1rem;">Wear &amp; Care helps you donate unused clothing to people in need through verified local partners.</p>
 
           <div class="d-flex flex-column flex-sm-row gap-2 mb-4">
+            {% if not session.get('is_admin') %}
             <a href="{{ url_for('donate') }}" class="btn btn-wc-accent btn-lg">🎁 Start donating</a>
+            {% endif %}
             <a href="#how" class="btn btn-outline-light btn-lg">📚 How it works</a>
           </div>
 
@@ -96,8 +98,12 @@
       </div>
       <div class="d-flex gap-2">
         {% if user_id %}
-          <a href="{{ url_for('donate') }}" class="btn btn-wc-accent btn-lg">Donate now</a>
-          <a href="{{ url_for('dashboard') }}" class="btn btn-wc-ghost btn-lg">View dashboard</a>
+          {% if session.get('is_admin') %}
+            <a href="{{ url_for('admin') }}" class="btn btn-wc-accent btn-lg">Admin Panel</a>
+          {% else %}
+            <a href="{{ url_for('donate') }}" class="btn btn-wc-accent btn-lg">Donate now</a>
+            <a href="{{ url_for('dashboard') }}" class="btn btn-wc-ghost btn-lg">View dashboard</a>
+          {% endif %}
         {% else %}
           <a href="{{ url_for('register') }}" class="btn btn-wc-primary btn-lg">Get Started</a>
           <a href="{{ url_for('listings') }}" class="btn btn-wc-ghost btn-lg">Browse Listings</a>
