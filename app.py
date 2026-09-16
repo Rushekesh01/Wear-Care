@@ -1,8 +1,10 @@
 import datetime
 import os
 import random
+import re
 import smtplib
 import time
+from collections import defaultdict
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 from functools import wraps
@@ -41,6 +43,30 @@ init_supabase()
 # GMAIL SMTP SETUP
 GMAIL_USER = os.environ.get("GMAIL_SMTP_USER", "").strip()
 GMAIL_APP_PASSWORD = os.environ.get("GMAIL_SMTP_PASSWORD", "").strip()
+
+# RATE LIMITING: Track OTP sends per IP {ip: [timestamp, ...]}
+_otp_rate_limit = defaultdict(list)
+OTP_RATE_LIMIT_MAX = 3       # max OTP emails per IP
+OTP_RATE_LIMIT_WINDOW = 600  # seconds (10 minutes)
+OTP_COOLDOWN_KEY = 'last_otp_sent_at'
+OTP_COOLDOWN_SECS = 60       # minimum seconds between OTPs per session
+
+def _is_valid_email(email):
+    """Basic sanity check — reject obviously fake/malformed emails."""
+    if not email or len(email) > 254:
+        return False
+    pattern = r'^[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}$'
+    return bool(re.match(pattern, email))
+
+def _check_rate_limit(ip):
+    """Returns True if the IP is allowed to send another OTP, False if rate-limited."""
+    now = time.time()
+    # Remove timestamps outside the window
+    _otp_rate_limit[ip] = [t for t in _otp_rate_limit[ip] if now - t < OTP_RATE_LIMIT_WINDOW]
+    if len(_otp_rate_limit[ip]) >= OTP_RATE_LIMIT_MAX:
+        return False
+    _otp_rate_limit[ip].append(now)
+    return True
 
 # ADMIN CREDENTIALS (loaded from .env) - LEGACY, use get_admin_credentials() instead
 ADMIN_EMAIL = os.environ.get("ADMIN_EMAIL", "admin@wearandcare.com").strip()
@@ -116,9 +142,30 @@ def send_email_async(to_email, otp_code, action_text):
     except Exception as e:
         print(f"Failed to send OTP via Gmail SMTP: {str(e)}")
 
-def send_otp_email(to_email, otp_code, action_text="Verification"):
+def send_otp_email(to_email, otp_code, action_text="Verification", client_ip=None, flask_session=None):
+    """Send OTP email with rate limiting, email validation, and cooldown protection."""
     import threading
+
+    # 1. Validate email format
+    if not _is_valid_email(to_email):
+        print(f"[SPAM BLOCK] Invalid email format rejected: {to_email}")
+        return False
+
+    # 2. Per-IP rate limit
+    if client_ip and not _check_rate_limit(client_ip):
+        print(f"[SPAM BLOCK] Rate limit hit for IP: {client_ip}")
+        return False
+
+    # 3. Per-session cooldown (prevent double-sends on page refresh)
+    if flask_session is not None:
+        last_sent = flask_session.get(OTP_COOLDOWN_KEY, 0)
+        if time.time() - last_sent < OTP_COOLDOWN_SECS:
+            print(f"[SPAM BLOCK] OTP cooldown active for session, skipping send")
+            return True  # Return True so the UI still redirects to OTP page
+        flask_session[OTP_COOLDOWN_KEY] = time.time()
+
     thread = threading.Thread(target=send_email_async, args=(to_email, otp_code, action_text))
+    thread.daemon = True
     thread.start()
     return True
 
@@ -228,6 +275,10 @@ def register():
         if not name or not email:
             return render_template("register.html", error="Please fill all fields")
 
+        # Validate email format before doing anything
+        if not _is_valid_email(email):
+            return render_template("register.html", error="Please enter a valid email address.")
+
         # Check if email is already registered in the database to prevent duplicate signups
         try:
             existing_user = supabase.table('users').select('id').eq('email', email).execute()
@@ -242,9 +293,10 @@ def register():
         session['signup_email'] = email
         session['signup_name'] = name
 
-        # Send via our completely custom Gmail logic
-        if not send_otp_email(email, otp, "Account Registration"):
-            return render_template("register.html", error="Unable to send verification email right now. Please try again later.")
+        # Send via our completely custom Gmail logic (with rate limiting)
+        client_ip = request.environ.get('HTTP_X_FORWARDED_FOR', request.remote_addr)
+        if not send_otp_email(email, otp, "Account Registration", client_ip=client_ip, flask_session=session):
+            return render_template("register.html", error="Too many requests. Please wait a few minutes before trying again.")
 
         return redirect(f"/verify-otp?email={email}")
 
@@ -258,15 +310,28 @@ def login():
         
         if not email:
             return render_template("login.html", error="Please enter your email")
+
+        # Validate email format
+        if not _is_valid_email(email):
+            return render_template("login.html", error="Please enter a valid email address.")
+
+        # Only send OTP if user actually exists (prevents sending OTPs to random addresses)
+        try:
+            user_check = supabase.table('users').select('id').eq('email', email).execute()
+            if not user_check.data:
+                return render_template("login.html", error="No account found with this email. Please register first.")
+        except Exception:
+            return render_template("login.html", error="Service temporarily unavailable. Please try again later.")
         
         # Generate 6-digit OTP
         login_otp = str(random.randint(100000, 999999))
         session['login_otp'] = login_otp
         session['login_email'] = email
 
-        # Send OTP via email
-        if not send_otp_email(email, login_otp, "Login"):
-            return render_template("login.html", error="Unable to send login OTP right now. Please try again later.")
+        # Send OTP via email with rate limiting
+        client_ip = request.environ.get('HTTP_X_FORWARDED_FOR', request.remote_addr)
+        if not send_otp_email(email, login_otp, "Login", client_ip=client_ip, flask_session=session):
+            return render_template("login.html", error="Too many requests. Please wait a few minutes before trying again.")
 
         return redirect(f"/verify-login-otp?email={email}")
 
@@ -379,14 +444,28 @@ def forgot_password():
         if not email:
             return render_template("forgot_password.html", error="Please enter your email.")
 
+        # Validate email format
+        if not _is_valid_email(email):
+            return render_template("forgot_password.html", error="Please enter a valid email address.")
+
+        # Only send reset OTP if user exists — don't leak to random addresses
+        try:
+            user_check = supabase.table('users').select('id').eq('email', email).execute()
+            if not user_check.data:
+                # Show generic message to avoid email enumeration
+                return render_template("forgot_password.html", success="If an account with that email exists, a reset code has been sent.")
+        except Exception:
+            return render_template("forgot_password.html", error="Service temporarily unavailable. Please try again later.")
+
         # Generate custom OTP in Flask
         otp = str(random.randint(100000, 999999))
         session['reset_otp'] = otp
         session['reset_email'] = email
 
-        # Send strictly 6 digit OTP via custom Gmail
-        if not send_otp_email(email, otp, "Password Reset"):
-            return render_template("forgot_password.html", error="Unable to send reset OTP right now. Please try again later.")
+        # Send strictly 6 digit OTP via custom Gmail with rate limiting
+        client_ip = request.environ.get('HTTP_X_FORWARDED_FOR', request.remote_addr)
+        if not send_otp_email(email, otp, "Password Reset", client_ip=client_ip, flask_session=session):
+            return render_template("forgot_password.html", error="Too many requests. Please wait a few minutes before trying again.")
 
         return redirect(f"/reset-password?email={email}")
 
