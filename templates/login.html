@@ -14,6 +14,11 @@
       <div class="wc-card">
         <div class="wc-card-body">
           <form method="POST" action="/login" novalidate>
+            <!-- Anti-bot honeypot field -->
+            <div style="display:none !important; visibility:hidden !important; opacity:0; position:absolute; left:-9999px;">
+              <input type="text" name="website_hp" tabindex="-1" autocomplete="off">
+            </div>
+
             {% with messages = get_flashed_messages(with_categories=true) %}
               {% if messages %}
                 {% for category, message in messages %}

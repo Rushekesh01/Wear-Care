@@ -14,6 +14,11 @@
       <div class="wc-card">
         <div class="wc-card-body">
           <form method="POST" action="/register" novalidate>
+            <!-- Anti-bot honeypot field -->
+            <div style="display:none !important; visibility:hidden !important; opacity:0; position:absolute; left:-9999px;">
+              <input type="text" name="website_hp" tabindex="-1" autocomplete="off">
+            </div>
+
             {% if error %}
               <div class="alert alert-danger mb-3" role="alert">{{ error }}</div>
             {% endif %}
